@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import SubmitComplaint from './pages/SubmitComplaint'
+import MyComplaints from './pages/MyComplaints'
 import AdminDashboard from './pages/AdminDashboard'
 
 function App() {
@@ -29,8 +30,9 @@ function App() {
         <Route path="/" element={<Landing isLoggedIn={isLoggedIn} />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/submit" element={<SubmitComplaint />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/submit" element={<SubmitComplaint />} />
+        <Route path="/my-complaints" element={<MyComplaints />} />
         <Route path="/admin" element={<AdminDashboard />} />
       </Routes>
     </Router>
