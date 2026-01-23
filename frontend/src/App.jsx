@@ -5,6 +5,7 @@ import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
+import Profile from './pages/Profile'
 import SubmitComplaint from './pages/SubmitComplaint'
 import MyComplaints from './pages/MyComplaints'
 import AdminDashboard from './pages/AdminDashboard'
@@ -26,7 +27,15 @@ function App() {
             </PrivateRoute>
           }
         />
-        <Route path="/submit" element={<SubmitComplaint />} />
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute>
+              <Profile />
+            </PrivateRoute>
+          }
+        />
+        <Route path="/submit-complaint" element={<SubmitComplaint />} />
         <Route path="/my-complaints" element={<MyComplaints />} />
         <Route path="/admin" element={<AdminDashboard />} />
       </Routes>

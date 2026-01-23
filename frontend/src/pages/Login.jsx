@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import axios from "axios";
+import { Link, useNavigate } from "react-router-dom";
+import api from "../services/api";
 import { Shield } from 'lucide-react';
 
 const Login = () => {
@@ -8,6 +8,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -15,15 +16,16 @@ const Login = () => {
     setError("");
 
     try {
-      const res = await axios.post(
-        "http://127.0.0.1:8000/api/login/",
-        { email, password }
-      );
+      const res = await api.post("/api/login/", { email, password });
 
       localStorage.setItem("access", res.data.access);
       localStorage.setItem("refresh", res.data.refresh);
+      
+      // The interceptor in api.js will now automatically add the new token to subsequent requests
+      // We need to update the header for the current session explicitly if we make more calls right away
+      api.defaults.headers.common['Authorization'] = `Bearer ${res.data.access}`;
 
-      window.location.href = "/dashboard";
+      navigate("/dashboard");
     } catch (err) {
       console.error('Login error:', err.response?.data || err.message)
       const errorMsg = err.response?.data?.detail || 
@@ -125,4 +127,3 @@ const Login = () => {
 };
 
 export default Login;
-

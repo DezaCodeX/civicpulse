@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
+import api from '../services/api'
 
 function SubmitComplaint() {
   const navigate = useNavigate()
@@ -9,7 +10,18 @@ function SubmitComplaint() {
     location: '',
     description: '',
   })
+  const [profile, setProfile] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    api.get('/api/profile/')
+      .then(res => {
+        setProfile(res.data)
+      })
+      .catch(err => {
+        console.error("Failed to fetch profile", err)
+      })
+  }, [])
 
   const categories = [
     'Roads & Infrastructure',
@@ -33,7 +45,7 @@ function SubmitComplaint() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!formData.category || !formData.location || !formData.description) {
       alert('Please fill in all required fields')
       return
@@ -42,19 +54,29 @@ function SubmitComplaint() {
     setIsSubmitting(true)
 
     try {
-      // Simulated submission - replace with actual API call
-      setTimeout(() => {
-        console.log('Complaint submitted:', formData)
-        setFormData({
-          category: '',
-          location: '',
-          description: '',
-        })
-        setIsSubmitting(false)
-        navigate('/my-complaints')
-      }, 1500)
+      const complaintData = {
+        ...formData,
+        // Include profile details
+        user_details: profile ? {
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          phone_number: profile.phone_number,
+          address: profile.address,
+          city: profile.city,
+          state: profile.state,
+        } : null
+      }
+      await api.post('/api/complaints/', complaintData)
+      setFormData({
+        category: '',
+        location: '',
+        description: '',
+      })
+      navigate('/my-complaints')
     } catch (error) {
       console.error('Submission failed:', error)
+      alert('Failed to submit complaint. Please try again.')
+    } finally {
       setIsSubmitting(false)
     }
   }

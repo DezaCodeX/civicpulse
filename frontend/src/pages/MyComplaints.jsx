@@ -11,15 +11,25 @@ function MyComplaints() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Resolved':
+      case 'resolved':
         return 'bg-green-100 text-green-800'
-      case 'In Progress':
+      case 'in_progress':
         return 'bg-blue-100 text-blue-800'
-      case 'Pending':
+      case 'pending':
         return 'bg-yellow-100 text-yellow-800'
+      case 'rejected':
+        return 'bg-red-100 text-red-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    )
   }
 
   return (
@@ -41,7 +51,7 @@ function MyComplaints() {
             <p className="text-gray-600">Track the status of your submissions</p>
           </div>
           <button
-            onClick={() => navigate('/submit')}
+            onClick={() => navigate('/submit-complaint')}
             className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
           >
             <Plus size={20} />
@@ -58,7 +68,7 @@ function MyComplaints() {
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No complaints yet</h3>
             <p className="text-gray-600 mb-8">Submit your first complaint to get started</p>
             <button
-              onClick={() => navigate('/submit')}
+              onClick={() => navigate('/submit-complaint')}
               className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
             >
               <Plus size={20} />
@@ -71,7 +81,7 @@ function MyComplaints() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -81,15 +91,15 @@ function MyComplaints() {
                 <tbody className="divide-y divide-gray-200">
                   {complaints.map(complaint => (
                     <tr key={complaint.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm text-gray-900 font-medium">{complaint.title}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900 font-medium">{complaint.description.substring(0, 50)}...</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{complaint.category}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{complaint.location}</td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(complaint.status)}`}>
-                          {complaint.status}
+                          {complaint.status.replace('_', ' ').toUpperCase()}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{complaint.date}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{new Date(complaint.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}
                 </tbody>

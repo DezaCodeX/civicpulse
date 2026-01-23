@@ -15,10 +15,31 @@ class SignupView(generics.CreateAPIView):
     permission_classes = (permissions.AllowAny,)
     serializer_class = RegisterSerializer
 
-@api_view(['GET'])
+@api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
 def user_profile(request):
-    serializer = CustomUserSerializer(request.user)
-    return Response(serializer.data)
+    if request.method == 'GET':
+        serializer = CustomUserSerializer(request.user)
+        return Response(serializer.data)
+    elif request.method == 'PUT':
+        serializer = CustomUserSerializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def complaint_list_create(request):
+    if request.method == 'GET':
+        complaints = Complaint.objects.filter(user=request.user)
+        serializer = ComplaintSerializer(complaints, many=True)
+        return Response(serializer.data)
+    elif request.method == 'POST':
+        serializer = ComplaintSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
 
 
