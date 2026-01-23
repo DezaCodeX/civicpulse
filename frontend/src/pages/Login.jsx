@@ -24,8 +24,12 @@ const Login = () => {
       localStorage.setItem("refresh", res.data.refresh);
 
       window.location.href = "/dashboard";
-    } catch {
-      setError("Invalid credentials. Please try again.");
+    } catch (err) {
+      console.error('Login error:', err.response?.data || err.message)
+      const errorMsg = err.response?.data?.detail || 
+                       err.response?.data?.non_field_errors?.[0] ||
+                       "Invalid credentials. Please try again.";
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }

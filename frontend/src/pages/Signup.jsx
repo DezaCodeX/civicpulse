@@ -1,12 +1,14 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Shield } from 'lucide-react'
+import api from '../services/api'
 
 function Signup() {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     password: '',
+    password2: '',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -41,19 +43,34 @@ function Signup() {
       setLoading(false)
       return
     }
+    if (formData.password !== formData.password2) {
+      setError('Passwords do not match')
+      setLoading(false)
+      return
+    }
 
     try {
-      // TODO: Add your signup API call here
-      // const response = await fetch('/api/auth/signup', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData)
-      // })
+      const name_parts = formData.fullName.split(' ')
+      const first_name = name_parts[0]
+      const last_name = name_parts.slice(1).join(' ')
+
+      const response = await api.post('/api/signup/', {
+        first_name: first_name,
+        last_name: last_name,
+        email: formData.email,
+        password: formData.password,
+        password2: formData.password2,
+      })
       
-      // For now, just redirect to submit page
-      navigate('/submit')
+      console.log('Signup successful:', response.data)
+      navigate('/login')
     } catch (err) {
-      setError('Failed to create account. Please try again.')
+      console.error('Signup error:', err.response?.data || err.message)
+      const errorMsg = err.response?.data?.email?.[0] || 
+                       err.response?.data?.password?.[0] ||
+                       err.response?.data?.detail ||
+                       'Failed to create account. Please try again.'
+      setError(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -152,6 +169,29 @@ function Signup() {
               />
             </div>
           </div>
+
+          {/* Confirm Password */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Confirm Password
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <input
+                type="password"
+                name="password2"
+                value={formData.password2}
+                onChange={handleChange}
+                placeholder="••••••••"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
 
           {/* Create Account Button */}
           <button
