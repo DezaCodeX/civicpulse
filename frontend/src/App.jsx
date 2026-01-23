@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Landing from './pages/Landing'
@@ -8,29 +8,24 @@ import Dashboard from './pages/Dashboard'
 import SubmitComplaint from './pages/SubmitComplaint'
 import MyComplaints from './pages/MyComplaints'
 import AdminDashboard from './pages/AdminDashboard'
+import PrivateRoute from './components/PrivateRoute'
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [userRole, setUserRole] = useState(null)
-
-  const handleLogin = (role) => {
-    setIsLoggedIn(true)
-    setUserRole(role)
-  }
-
-  const handleLogout = () => {
-    setIsLoggedIn(false)
-    setUserRole(null)
-  }
-
   return (
     <Router>
-      <Navbar isLoggedIn={isLoggedIn} userRole={userRole} onLogout={handleLogout} />
+      <Navbar />
       <Routes>
-        <Route path="/" element={<Landing isLoggedIn={isLoggedIn} />} />
-        <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute>
+              <Dashboard />
+            </PrivateRoute>
+          }
+        />
         <Route path="/submit" element={<SubmitComplaint />} />
         <Route path="/my-complaints" element={<MyComplaints />} />
         <Route path="/admin" element={<AdminDashboard />} />
