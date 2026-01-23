@@ -4,10 +4,12 @@ import { Zap, BarChart3, TrendingUp } from 'lucide-react'
 import FeatureCard from '../components/FeatureCard'
 import StatCard from '../components/StatCard'
 import StepCard from '../components/StepCard'
+import TestBackend from '../components/TestBackend'
 
 function Landing({ isLoggedIn }) {
   return (
     <div className="min-h-screen bg-white">
+      <TestBackend />
       {/* Hero Section */}
       <section className="hero-section h-screen flex items-center justify-center text-center text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 opacity-75"></div>
