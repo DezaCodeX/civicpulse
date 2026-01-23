@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
+import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import SubmitComplaint from './pages/SubmitComplaint'
 import AdminDashboard from './pages/AdminDashboard'
@@ -27,6 +28,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing isLoggedIn={isLoggedIn} />} />
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="/signup" element={<Signup />} />
         <Route path="/submit" element={<SubmitComplaint />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/admin" element={<AdminDashboard />} />

@@ -2,12 +2,12 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Shield } from 'lucide-react'
 
-function Login({ onLogin }) {
+function Signup() {
   const [formData, setFormData] = useState({
+    fullName: '',
     email: '',
     password: '',
   })
-  const [role, setRole] = useState('citizen')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -26,6 +26,11 @@ function Login({ onLogin }) {
     setLoading(true)
     
     // Basic validation
+    if (!formData.fullName.trim()) {
+      setError('Full name is required')
+      setLoading(false)
+      return
+    }
     if (!formData.email.includes('@')) {
       setError('Please enter a valid email')
       setLoading(false)
@@ -38,28 +43,25 @@ function Login({ onLogin }) {
     }
 
     try {
-      // TODO: Add your login API call here
-      // const response = await fetch('/api/auth/login', {
+      // TODO: Add your signup API call here
+      // const response = await fetch('/api/auth/signup', {
       //   method: 'POST',
       //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ ...formData, role })
+      //   body: JSON.stringify(formData)
       // })
       
-      // Simulated login - replace with actual API call
-      setTimeout(() => {
-        onLogin(role)
-        navigate(role === 'admin' ? '/admin' : '/dashboard')
-        setLoading(false)
-      }, 1000)
+      // For now, just redirect to submit page
+      navigate('/submit')
     } catch (err) {
-      setError('Failed to sign in. Please try again.')
+      setError('Failed to create account. Please try again.')
+    } finally {
       setLoading(false)
     }
   }
 
-  const handleGoogleLogin = () => {
-    // TODO: Implement Google OAuth login
-    console.log('Google login clicked')
+  const handleGoogleSignup = () => {
+    // TODO: Implement Google OAuth signup
+    console.log('Google signup clicked')
   }
 
   return (
@@ -72,8 +74,8 @@ function Login({ onLogin }) {
               <Shield size={28} />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your account</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Create Account</h1>
+          <p className="text-gray-600">Join CivicPulse to submit and track complaints</p>
         </div>
 
         {/* Error Message */}
@@ -83,39 +85,30 @@ function Login({ onLogin }) {
           </div>
         )}
 
-        {/* Login As Selector */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
-            Login As
-          </label>
-          <div className="flex gap-3">
-            <label className="flex-1 flex items-center">
-              <input
-                type="radio"
-                name="role"
-                value="citizen"
-                checked={role === 'citizen'}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-4 h-4 text-blue-600 cursor-pointer"
-              />
-              <span className="ml-2 text-sm text-gray-700 cursor-pointer">Citizen</span>
-            </label>
-            <label className="flex-1 flex items-center">
-              <input
-                type="radio"
-                name="role"
-                value="admin"
-                checked={role === 'admin'}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-4 h-4 text-blue-600 cursor-pointer"
-              />
-              <span className="ml-2 text-sm text-gray-700 cursor-pointer">Admin</span>
-            </label>
-          </div>
-        </div>
-
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Full Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Full Name
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleChange}
+                placeholder="John Doe"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
           {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -160,13 +153,13 @@ function Login({ onLogin }) {
             </div>
           </div>
 
-          {/* Sign In Button */}
+          {/* Create Account Button */}
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-gray-900 hover:bg-gray-800 disabled:bg-gray-500 text-white font-semibold py-2 rounded-lg transition-colors duration-200"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Creating Account...' : 'Create Account'}
           </button>
         </form>
 
@@ -177,29 +170,22 @@ function Login({ onLogin }) {
           <div className="flex-1 border-t border-gray-300"></div>
         </div>
 
-        {/* Google Login */}
+        {/* Google Signup */}
         <button
-          onClick={handleGoogleLogin}
+          onClick={handleGoogleSignup}
           className="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032 c0-3.331,2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.461,2.268,15.199,1.393,12.545,1.393 c-6.256,0-11.331,5.075-11.331,11.322c0,6.247,5.075,11.322,11.331,11.322c10.684,0,11.965-9.869,11.304-14.61H12.545Z" />
           </svg>
-          Sign in with Google
+          Sign up with Google
         </button>
 
-        {/* Demo Credentials */}
-        <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-gray-700">
-          <p className="font-semibold text-blue-900 mb-2">Demo Credentials</p>
-          <p>Email: demo@civicpulse.com</p>
-          <p>Password: demo123</p>
-        </div>
-
-        {/* Signup Link */}
+        {/* Login Link */}
         <p className="text-center text-gray-600 text-sm mt-6">
-          Don't have an account?{' '}
-          <Link to="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-            Create one here
+          Already have an account?{' '}
+          <Link to="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+            Sign in here
           </Link>
         </p>
       </div>
@@ -207,4 +193,4 @@ function Login({ onLogin }) {
   )
 }
 
-export default Login
+export default Signup

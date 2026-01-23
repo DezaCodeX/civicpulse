@@ -37,9 +37,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'frontend',
+   # 'frontend',
 ]
-AUTH_USER_MODEL = 'frontend.User'
+#AUTH_USER_MODEL = 'frontend.User'
 
 
 MIDDLEWARE = [

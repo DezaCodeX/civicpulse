@@ -26,7 +26,7 @@ function Landing({ isLoggedIn }) {
             of citizen complaints through advanced NLP and machine learning.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/submit" className="btn-primary text-lg">
+            <Link to="/signup" className="btn-primary text-lg">
               Get Started →
             </Link>
             <Link to="/login" className="btn-secondary text-lg">
