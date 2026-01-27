@@ -57,10 +57,11 @@ export const getUserProfile = async (userId) => {
 export const updateUserProfile = async (userId, updates) => {
   try {
     const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
       ...updates,
       updated_at: serverTimestamp(),
-    });
+    }, { merge: true });
+    console.log('Profile updated successfully for user:', userId);
   } catch (error) {
     console.error('Error updating user profile:', error);
     throw error;

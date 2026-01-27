@@ -94,8 +94,11 @@ const Profile = () => {
       const userId = localStorage.getItem('userId');
       if (!userId) {
         setError('User not authenticated.');
+        setSaving(false);
         return;
       }
+
+      console.log('Profile: Updating profile for user:', userId);
 
       // Prepare profile data
       const profileData = {
@@ -108,12 +111,17 @@ const Profile = () => {
         email: profile.email,
       };
 
+      console.log('Profile: Profile data to save:', profileData);
+
       // Update profile in Firestore
       await updateUserProfile(userId, profileData);
+      console.log('Profile: Successfully updated');
       setSuccess('Profile updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error("Failed to update profile", err);
-      setError('Failed to update profile. Please try again.');
+      console.error('Error details:', err.code, err.message);
+      setError(`Failed to update profile. Error: ${err.message || 'Please try again.'}`);
     } finally {
       setSaving(false);
     }
