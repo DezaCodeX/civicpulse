@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser, Complaint
+from .models import CustomUser, Complaint, ComplaintDocument
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -7,11 +7,27 @@ class CustomUserSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ('id', 'email', 'first_name', 'last_name', 'address', 'city', 'state', 'phone_number')
 
+class ComplaintDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ComplaintDocument
+        fields = ('id', 'file_name', 'file_size', 'file', 'uploaded_at')
+
 class ComplaintSerializer(serializers.ModelSerializer):
+    documents = ComplaintDocumentSerializer(many=True, read_only=True)
+    user = CustomUserSerializer(read_only=True)
+    
     class Meta:
         model = Complaint
-        fields = ('id', 'category', 'location', 'description', 'status', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        fields = ('id', 'title', 'description', 'category', 'department', 'latitude', 
+                  'longitude', 'location', 'status', 'support_count', 'is_public', 
+                  'documents', 'user', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'department', 'support_count', 'user', 'created_at', 'updated_at')
+
+class ComplaintCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating complaints (handles file uploads separately)"""
+    class Meta:
+        model = Complaint
+        fields = ('title', 'description', 'category', 'latitude', 'longitude', 'location')
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)

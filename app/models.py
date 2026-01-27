@@ -70,13 +70,56 @@ class Complaint(models.Model):
     ]
 
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='complaints')
-    category = models.CharField(max_length=100)
-    location = models.CharField(max_length=255)
+    
+    title = models.CharField(max_length=200, default='No Title')
     description = models.TextField()
+    category = models.CharField(max_length=100)
+    
+    # AI-based department classification
+    department = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Geolocation data
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    location = models.CharField(max_length=255, blank=True, null=True)
+    
+    # Status and engagement
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    support_count = models.IntegerField(default=0)
+    
+    # Privacy control
+    is_public = models.BooleanField(default=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['department', '-created_at']),
+        ]
+
     def __str__(self):
-        return f"{self.category} - {self.location}"
+        return f"{self.title} - {self.status}"
+
+
+class ComplaintDocument(models.Model):
+    """Store multiple file attachments for each complaint"""
+    complaint = models.ForeignKey(
+        Complaint,
+        related_name='documents',
+        on_delete=models.CASCADE
+    )
+    file = models.FileField(upload_to='complaints/%Y/%m/%d/')
+    file_name = models.CharField(max_length=255)
+    file_size = models.IntegerField()  # in bytes
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"{self.file_name} - {self.complaint.title}"
 

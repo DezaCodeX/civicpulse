@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Navigation } from 'lucide-react'
+import { ChevronLeft, Navigation, FileUp, X } from 'lucide-react'
 import { createComplaint, getUserProfile } from '../services/firestore'
+import { api } from '../services/api'
 
 function SubmitComplaint() {
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
+    title: '',
     category: '',
     location: '',
     description: '',
     latitude: null,
     longitude: null,
   })
+  const [files, setFiles] = useState([])
   const [profile, setProfile] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -73,16 +77,27 @@ function SubmitComplaint() {
     }))
   }
 
+  const handleFileChange = (e) => {
+    const selectedFiles = Array.from(e.target.files)
+    setFiles(prev => [...prev, ...selectedFiles])
+    e.target.value = ''
+  }
+
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!formData.category || !formData.location || !formData.description) {
+    if (!formData.title || !formData.category || !formData.location || !formData.description) {
       setError('Please fill in all required fields')
       return
     }
 
     setIsSubmitting(true)
     setError('')
+    setSuccess('')
 
     try {
       const userId = localStorage.getItem('userId')
@@ -92,7 +107,31 @@ function SubmitComplaint() {
         return
       }
 
+      // Prepare FormData for file upload
+      const submitData = new FormData()
+      submitData.append('title', formData.title)
+      submitData.append('category', formData.category)
+      submitData.append('location', formData.location)
+      submitData.append('description', formData.description)
+      submitData.append('latitude', formData.latitude || '')
+      submitData.append('longitude', formData.longitude || '')
+
+      // Add files
+      files.forEach(file => {
+        submitData.append('documents', file)
+      })
+
+      console.log('SubmitComplaint: Submitting complaint with', files.length, 'files')
+      
+      // Submit to Django backend with file uploads
+      const response = await api.post('/api/complaints/create/', submitData)
+      
+      console.log('SubmitComplaint: Response:', response.data)
+      setSuccess('Complaint submitted successfully!')
+      
+      // Also save to Firestore for React state management
       const complaintData = {
+        title: formData.title,
         category: formData.category,
         location: formData.location,
         description: formData.description,
@@ -102,17 +141,24 @@ function SubmitComplaint() {
       }
 
       await createComplaint(userId, complaintData)
+
+      // Reset form
       setFormData({
+        title: '',
         category: '',
         location: '',
         description: '',
         latitude: null,
         longitude: null,
       })
-      navigate('/my-complaints')
+      setFiles([])
+
+      setTimeout(() => {
+        navigate('/my-complaints')
+      }, 1500)
     } catch (err) {
       console.error('Submission failed:', err)
-      setError('Failed to submit complaint. Please try again.')
+      setError(err.response?.data?.error || 'Failed to submit complaint. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -143,6 +189,13 @@ function SubmitComplaint() {
           </div>
         )}
 
+        {/* Success Alert */}
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+            ✓ {success}
+          </div>
+        )}
+
         {/* Form */}
         <div className="bg-white rounded-lg shadow-md p-8">
           <form onSubmit={handleSubmit} className="space-y-8">
@@ -150,6 +203,21 @@ function SubmitComplaint() {
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-1">Complaint Details</h2>
               <p className="text-sm text-gray-500 mb-6">Provide detailed information about the issue</p>
+
+              {/* Title */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Complaint Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  placeholder="Brief title of the complaint"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
 
               {/* Category */}
               <div className="mb-6">
@@ -221,6 +289,56 @@ function SubmitComplaint() {
                 />
                 <p className="text-xs text-gray-500 mt-2">Be specific and include relevant details for faster resolution</p>
               </div>
+            </div>
+
+            {/* File Upload Section */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Supporting Documents</h2>
+              <p className="text-sm text-gray-500 mb-6">Upload photos, videos, or documents to support your complaint (optional)</p>
+
+              <div className="mb-6">
+                <label className="block">
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 hover:bg-blue-50 transition cursor-pointer">
+                    <FileUp className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                    <p className="text-sm font-medium text-gray-700">Click to upload files</p>
+                    <p className="text-xs text-gray-500 mt-1">or drag and drop</p>
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleFileChange}
+                      className="hidden"
+                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                    />
+                  </div>
+                </label>
+              </div>
+
+              {/* Files List */}
+              {files.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Selected Files ({files.length})</h3>
+                  <div className="space-y-2">
+                    {files.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                        <div className="flex items-center gap-3 flex-1">
+                          <FileUp className="h-4 w-4 text-gray-400" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-700 truncate">{file.name}</p>
+                            <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(2)} KB</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          className="text-red-500 hover:text-red-700 ml-2"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Buttons */}
