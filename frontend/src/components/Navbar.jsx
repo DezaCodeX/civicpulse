@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { MenuIcon, XIcon } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 
 function Navbar({ isLoggedIn, userRole, onLogout }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -22,7 +22,7 @@ function Navbar({ isLoggedIn, userRole, onLogout }) {
             </Link>
             {isLoggedIn ? (
               <>
-                <Link to="/submit" className="px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
+                <Link to="/submit-complaint" className="px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
                   Submit Complaint
                 </Link>
                 <Link to={userRole === 'admin' ? '/admin' : '/dashboard'} className="px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
@@ -51,7 +51,7 @@ function Navbar({ isLoggedIn, userRole, onLogout }) {
             onClick={() => setIsOpen(!isOpen)}
             className="md:hidden text-gray-700"
           >
-            {isOpen ? <XIcon size={24} /> : <MenuIcon size={24} />}
+            {isOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
 
@@ -62,7 +62,7 @@ function Navbar({ isLoggedIn, userRole, onLogout }) {
             </Link>
             {isLoggedIn ? (
               <>
-                <Link to="/submit" className="block px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
+                <Link to="/submit-complaint" className="block px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
                   Submit Complaint
                 </Link>
                 <Link to={userRole === 'admin' ? '/admin' : '/dashboard'} className="block px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">

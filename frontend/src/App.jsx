@@ -7,11 +7,6 @@ import Verify from './pages/Verify'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
-import SubmitComplaint from './pages/SubmitComplaint'
-import MyComplaints from './pages/MyComplaints'
-import AdminDashboard from './pages/AdminDashboard'
-import PublicComplaints from './pages/PublicComplaints'
-import PublicComplaint from './pages/PublicComplaint'
 import PrivateRoute from './components/PrivateRoute'
 
 function App() {
@@ -39,13 +34,6 @@ function App() {
             </PrivateRoute>
           }
         />
-        <Route path="/submit-complaint" element={<SubmitComplaint />} />
-        <Route path="/my-complaints" element={<MyComplaints />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-        
-        {/* Public Pages - No Authentication Required */}
-        <Route path="/complaints" element={<PublicComplaints />} />
-        <Route path="/complaint/:complaintId" element={<PublicComplaint />} />
       </Routes>
     </Router>
   )

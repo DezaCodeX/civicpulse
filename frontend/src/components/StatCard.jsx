@@ -1,6 +1,6 @@
 import React from 'react'
 
-function StatCard({ value, label, color = 'blue' }) {
+function StatCard({ value, label, color }) {
   const colorClasses = {
     blue: 'text-blue-400',
     green: 'text-green-400',
@@ -8,11 +8,9 @@ function StatCard({ value, label, color = 'blue' }) {
   }
 
   return (
-    <div className="text-center">
-      <div className={`text-5xl font-bold ${colorClasses[color]} mb-2`}>
-        {value}
-      </div>
-      <p className="text-gray-400 text-lg">{label}</p>
+    <div className="bg-gray-800 p-8 rounded-lg text-center">
+      <h3 className={`text-5xl font-bold ${colorClasses[color]}`}>{value}</h3>
+      <p className="text-gray-400 mt-2">{label}</p>
     </div>
   )
 }
