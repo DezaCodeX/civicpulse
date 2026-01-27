@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../firebase";
 import { Shield, Mail, Loader } from 'lucide-react';
@@ -10,7 +10,10 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const googleProvider = new GoogleAuthProvider();
+
+  const isAdmin = location.state?.isAdmin || false;
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
@@ -25,7 +28,11 @@ const Login = () => {
       localStorage.setItem("userId", userId);
       localStorage.setItem("userEmail", result.user.email);
 
-      navigate("/dashboard");
+      if (isAdmin) {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err) {
       console.error('Login error:', err);
       console.error('Error code:', err.code);
@@ -95,8 +102,8 @@ const Login = () => {
               <Shield size={28} />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your account</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{isAdmin ? 'Admin Login' : 'Welcome Back'}</h1>
+          <p className="text-gray-600">{isAdmin ? 'Sign in to the admin dashboard' : 'Sign in to your account'}</p>
         </div>
 
         {error && (
@@ -159,31 +166,34 @@ const Login = () => {
             Forgot password?
           </button>
         </form>
+        {!isAdmin && (
+        <>
+          <div className="my-6 flex items-center">
+            <div className="flex-1 border-t border-gray-300"></div>
+            <span className="px-3 text-sm text-gray-500">Or</span>
+            <div className="flex-1 border-t border-gray-300"></div>
+          </div>
 
-        <div className="my-6 flex items-center">
-          <div className="flex-1 border-t border-gray-300"></div>
-          <span className="px-3 text-sm text-gray-500">Or</span>
-          <div className="flex-1 border-t border-gray-300"></div>
-        </div>
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            className="w-full border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 font-medium py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032 c0-3.331,2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.461,2.268,15.199,1.393,12.545,1.393 c-6.256,0-11.331,5.075-11.331,11.322c0,6.247,5.075,11.322,11.331,11.322c10.684,0,11.965-9.869,11.304-14.61H12.545Z" />
+            </svg>
+            Continue with Google
+          </button>
 
-        <button
-          type="button"
-          onClick={handleGoogleLogin}
-          disabled={loading}
-          className="w-full border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 font-medium py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-        >
-          <svg className="w-5 h-5" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032 c0-3.331,2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.461,2.268,15.199,1.393,12.545,1.393 c-6.256,0-11.331,5.075-11.331,11.322c0,6.247,5.075,11.322,11.331,11.322c10.684,0,11.965-9.869,11.304-14.61H12.545Z" />
-          </svg>
-          Continue with Google
-        </button>
-
-        <p className="text-center text-gray-600 text-sm mt-6">
-          Don't have an account?{' '}
-          <Link to="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-            Sign up here
-          </Link>
-        </p>
+          <p className="text-center text-gray-600 text-sm mt-6">
+            Don't have an account?{' '}
+            <Link to="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+              Sign up here
+            </Link>
+          </p>
+        </>
+        )}
       </div>
     </div>
   );

@@ -26,10 +26,10 @@ function Landing({ isLoggedIn }) {
             of citizen complaints through advanced NLP and machine learning.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/login" className="btn-primary text-lg">
+            <Link to={isLoggedIn ? "/dashboard" : "/login"} className="btn-primary text-lg">
               Get Started →
             </Link>
-            <Link to="/login" className="btn-secondary text-lg">
+            <Link to="/login" state={{ isAdmin: true }} className="btn-secondary text-lg">
               Login as Admin
             </Link>
           </div>
@@ -115,6 +115,7 @@ function Landing({ isLoggedIn }) {
             </Link>
             <Link
               to="/login"
+              state={{ isAdmin: true }}
               className="px-8 py-4 border-2 border-white text-white font-bold rounded-lg hover:bg-white hover:text-blue-600 transition-colors"
             >
               Admin Login

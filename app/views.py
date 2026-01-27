@@ -115,13 +115,24 @@ def complaint_list_create(request):
 # ==================== MODULE 2: MULTIPLE FILE UPLOAD API ====================
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
 def create_complaint_with_files(request):
     """
     Create complaint with multiple file uploads.
     Accepts FormData with documents[] array.
     """
     try:
+        # Get user from Firebase UID
+        firebase_uid = request.data.get('firebase_uid')
+        
+        if not firebase_uid:
+            return Response({'error': 'Firebase UID required'}, status=400)
+        
+        # Get or create user from Firebase UID
+        user, created = CustomUser.objects.get_or_create(
+            firebase_uid=firebase_uid,
+            defaults={'email': request.data.get('email', f'{firebase_uid}@firebase.local')}
+        )
+        
         description = request.data.get('description', '')
         title = request.data.get('title', '')
         category = request.data.get('category', '')
@@ -134,7 +145,7 @@ def create_complaint_with_files(request):
         
         # Create complaint
         complaint = Complaint.objects.create(
-            user=request.user,
+            user=user,
             title=title,
             description=description,
             category=category,
