@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Shield } from 'lucide-react'
-import api from '../services/api'
+import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile } from 'firebase/auth'
+import { Shield, Loader } from 'lucide-react'
+import { auth } from '../firebase'
+import { createUserProfile } from '../services/firestore'
 
 function Signup() {
   const [formData, setFormData] = useState({
@@ -13,6 +15,7 @@ function Signup() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const googleProvider = new GoogleAuthProvider()
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -50,35 +53,91 @@ function Signup() {
     }
 
     try {
+      // Create Firebase user
+      const firebaseResult = await createUserWithEmailAndPassword(auth, formData.email, formData.password)
+      const userId = firebaseResult.user.uid
+
+      // Parse name
       const name_parts = formData.fullName.split(' ')
       const first_name = name_parts[0]
       const last_name = name_parts.slice(1).join(' ')
 
-      const response = await api.post('/api/signup/', {
+      // Update Firebase user profile with display name
+      await updateProfile(firebaseResult.user, {
+        displayName: formData.fullName
+      })
+
+      // Save user profile to Firestore
+      await createUserProfile(userId, {
+        email: formData.email,
         first_name: first_name,
         last_name: last_name,
-        email: formData.email,
-        password: formData.password,
-        password2: formData.password2,
+        address: '',
+        city: '',
+        state: '',
+        phone_number: '',
       })
-      
-      console.log('Signup successful:', response.data)
-      navigate('/login')
+
+      // Store user ID in localStorage for future use
+      localStorage.setItem("userId", userId)
+      localStorage.setItem("userEmail", formData.email)
+
+      console.log('Signup successful!')
+      navigate('/dashboard')
     } catch (err) {
-      console.error('Signup error:', err.response?.data || err.message)
-      const errorMsg = err.response?.data?.email?.[0] || 
-                       err.response?.data?.password?.[0] ||
-                       err.response?.data?.detail ||
-                       'Failed to create account. Please try again.'
+      console.error('Signup error:', err)
+      let errorMsg = 'Failed to create account. Please try again.'
+      
+      if (err.code === 'auth/email-already-in-use') {
+        errorMsg = 'Email already in use. Please sign in instead.'
+      } else if (err.code === 'auth/weak-password') {
+        errorMsg = 'Password is too weak. Please use a stronger password.'
+      } else if (err.message) {
+        errorMsg = err.message
+      }
+      
       setError(errorMsg)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleGoogleSignup = () => {
-    // TODO: Implement Google OAuth signup
-    console.log('Google signup clicked')
+  const handleGoogleSignup = async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const firebaseResult = await signInWithPopup(auth, googleProvider)
+      const userId = firebaseResult.user.uid
+
+      // Get display name from Google
+      const displayName = firebaseResult.user.displayName || ''
+      const name_parts = displayName.split(' ')
+      const first_name = name_parts[0] || ''
+      const last_name = name_parts.slice(1).join(' ') || ''
+
+      // Save or create user profile in Firestore
+      await createUserProfile(userId, {
+        email: firebaseResult.user.email,
+        first_name: first_name,
+        last_name: last_name,
+        address: '',
+        city: '',
+        state: '',
+        phone_number: '',
+      })
+
+      // Store user ID in localStorage
+      localStorage.setItem("userId", userId)
+      localStorage.setItem("userEmail", firebaseResult.user.email)
+
+      navigate('/dashboard')
+    } catch (err) {
+      console.error('Google signup error:', err)
+      setError(err.message || 'Failed to sign up with Google.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -197,8 +256,9 @@ function Signup() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gray-900 hover:bg-gray-800 disabled:bg-gray-500 text-white font-semibold py-2 rounded-lg transition-colors duration-200"
+            className="w-full bg-gray-900 hover:bg-gray-800 disabled:bg-gray-500 text-white font-semibold py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
           >
+            {loading && <Loader size={18} className="animate-spin" />}
             {loading ? 'Creating Account...' : 'Create Account'}
           </button>
         </form>
@@ -212,8 +272,10 @@ function Signup() {
 
         {/* Google Signup */}
         <button
+          type="button"
           onClick={handleGoogleSignup}
-          className="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+          disabled={loading}
+          className="w-full border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 font-medium py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032 c0-3.331,2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.461,2.268,15.199,1.393,12.545,1.393 c-6.256,0-11.331,5.075-11.331,11.322c0,6.247,5.075,11.322,11.331,11.322c10.684,0,11.965-9.869,11.304-14.61H12.545Z" />

@@ -25,6 +25,7 @@ class CustomUserManager(BaseUserManager):
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
+    firebase_uid = models.CharField(max_length=255, unique=True, null=True, blank=True)
     first_name = models.CharField(max_length=30, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
     address = models.CharField(max_length=255, blank=True, null=True)

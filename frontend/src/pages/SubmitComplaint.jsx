@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft } from 'lucide-react'
-import api from '../services/api'
+import { ChevronLeft, Navigation } from 'lucide-react'
+import { createComplaint, getUserProfile } from '../services/firestore'
 
 function SubmitComplaint() {
   const navigate = useNavigate()
@@ -9,19 +9,49 @@ function SubmitComplaint() {
     category: '',
     location: '',
     description: '',
+    latitude: null,
+    longitude: null,
   })
   const [profile, setProfile] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    api.get('/api/profile/')
-      .then(res => {
-        setProfile(res.data)
-      })
-      .catch(err => {
+    const loadProfile = async () => {
+      try {
+        const userId = localStorage.getItem('userId')
+        if (!userId) {
+          navigate('/login')
+          return
+        }
+
+        const userData = await getUserProfile(userId)
+        if (userData) {
+          setProfile(userData)
+        }
+      } catch (err) {
         console.error("Failed to fetch profile", err)
-      })
-  }, [])
+      }
+    }
+
+    loadProfile()
+
+    // Fetch geolocation
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setFormData(prev => ({
+            ...prev,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          }))
+        },
+        (err) => {
+          console.warn("Location access denied:", err)
+        }
+      )
+    }
+  }, [navigate])
 
   const categories = [
     'Roads & Infrastructure',
@@ -47,35 +77,42 @@ function SubmitComplaint() {
     e.preventDefault()
 
     if (!formData.category || !formData.location || !formData.description) {
-      alert('Please fill in all required fields')
+      setError('Please fill in all required fields')
       return
     }
 
     setIsSubmitting(true)
+    setError('')
 
     try {
-      const complaintData = {
-        ...formData,
-        // Include profile details
-        user_details: profile ? {
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          phone_number: profile.phone_number,
-          address: profile.address,
-          city: profile.city,
-          state: profile.state,
-        } : null
+      const userId = localStorage.getItem('userId')
+      if (!userId) {
+        setError('User not authenticated. Please log in.')
+        navigate('/login')
+        return
       }
-      await api.post('/api/complaints/', complaintData)
+
+      const complaintData = {
+        category: formData.category,
+        location: formData.location,
+        description: formData.description,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        status: 'pending',
+      }
+
+      await createComplaint(userId, complaintData)
       setFormData({
         category: '',
         location: '',
         description: '',
+        latitude: null,
+        longitude: null,
       })
       navigate('/my-complaints')
-    } catch (error) {
-      console.error('Submission failed:', error)
-      alert('Failed to submit complaint. Please try again.')
+    } catch (err) {
+      console.error('Submission failed:', err)
+      setError('Failed to submit complaint. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -98,6 +135,13 @@ function SubmitComplaint() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Submit Complaint</h1>
           <p className="text-gray-600">Report an issue and help improve your community</p>
         </div>
+
+        {/* Error Alert */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {error}
+          </div>
+        )}
 
         {/* Form */}
         <div className="bg-white rounded-lg shadow-md p-8">
@@ -145,6 +189,22 @@ function SubmitComplaint() {
                   />
                 </div>
               </div>
+
+              {/* Geolocation Display */}
+              {formData.latitude && formData.longitude && (
+                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center mb-2">
+                    <Navigation className="h-5 w-5 text-blue-600 mr-2" />
+                    <h3 className="font-semibold text-blue-900">Auto-detected Location</h3>
+                  </div>
+                  <p className="text-sm text-blue-800">
+                    Latitude: <strong>{formData.latitude.toFixed(6)}</strong>
+                  </p>
+                  <p className="text-sm text-blue-800">
+                    Longitude: <strong>{formData.longitude.toFixed(6)}</strong>
+                  </p>
+                </div>
+              )}
 
               {/* Description */}
               <div>

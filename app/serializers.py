@@ -7,6 +7,12 @@ class CustomUserSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ('id', 'email', 'first_name', 'last_name', 'address', 'city', 'state', 'phone_number')
 
+class ComplaintSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Complaint
+        fields = ('id', 'category', 'location', 'description', 'status', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)
     password2 = serializers.CharField(write_only=True, required=True)

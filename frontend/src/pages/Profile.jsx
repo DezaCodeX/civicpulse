@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import api from '../services/api';
-import { User, Mail, Home, Phone, MapPin, Building } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { User, Mail, Home, Phone, MapPin, Building, Navigation } from 'lucide-react';
+import { getUserProfile, updateUserProfile } from '../services/firestore';
 
 const Profile = () => {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState({
     first_name: '',
     last_name: '',
@@ -12,23 +14,66 @@ const Profile = () => {
     state: '',
     phone_number: '',
   });
+  const [location, setLocation] = useState({
+    latitude: null,
+    longitude: null,
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    setLoading(true);
-    api.get('/api/profile/')
-      .then(res => {
-        setProfile(res.data);
+    const loadProfile = async () => {
+      setLoading(true);
+      try {
+        const userId = localStorage.getItem('userId');
+        if (!userId) {
+          setError('User not authenticated. Please log in.');
+          navigate('/login');
+          return;
+        }
+
+        const userData = await getUserProfile(userId);
+        if (userData) {
+          setProfile({
+            first_name: userData.first_name || '',
+            last_name: userData.last_name || '',
+            email: userData.email || '',
+            address: userData.address || '',
+            city: userData.city || '',
+            state: userData.state || '',
+            phone_number: userData.phone_number || '',
+          });
+        } else {
+          // New user - just set email
+          const userEmail = localStorage.getItem('userEmail') || '';
+          setProfile(prev => ({ ...prev, email: userEmail }));
+        }
         setLoading(false);
-      })
-      .catch(err => {
+      } catch (err) {
         console.error("Failed to fetch profile", err);
         setError('Failed to load profile data.');
         setLoading(false);
-      });
+      }
+    };
+
+    loadProfile();
+
+    // Fetch geolocation
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocation({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+        },
+        (err) => {
+          console.warn("Location access denied:", err);
+        }
+      );
+    }
   }, []);
 
   const handleChange = (e) => {
@@ -39,27 +84,39 @@ const Profile = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError('');
     setSuccess('');
 
-    // Don't submit the email
-    const { email, ...profileData } = profile;
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        setError('User not authenticated.');
+        return;
+      }
 
-    api.put('/api/profile/', profileData)
-      .then(res => {
-        setProfile(res.data);
-        setSuccess('Profile updated successfully!');
-      })
-      .catch(err => {
-        console.error("Failed to update profile", err);
-        setError('Failed to update profile. Please check your input.');
-      })
-      .finally(() => {
-        setSaving(false);
-      });
+      // Prepare profile data
+      const profileData = {
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        address: profile.address,
+        city: profile.city,
+        state: profile.state,
+        phone_number: profile.phone_number,
+        email: profile.email,
+      };
+
+      // Update profile in Firestore
+      await updateUserProfile(userId, profileData);
+      setSuccess('Profile updated successfully!');
+    } catch (err) {
+      console.error("Failed to update profile", err);
+      setError('Failed to update profile. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -117,6 +174,22 @@ const Profile = () => {
                 <input type="tel" name="phone_number" id="phone_number" value={profile.phone_number || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
               </div>
             </div>
+
+            {/* Geolocation */}
+            {location.latitude && location.longitude && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <Navigation className="h-5 w-5 text-blue-600 mr-2" />
+                  <h3 className="font-semibold text-blue-900">Your Location</h3>
+                </div>
+                <p className="text-sm text-blue-800">
+                  Latitude: <strong>{location.latitude.toFixed(6)}</strong>
+                </p>
+                <p className="text-sm text-blue-800">
+                  Longitude: <strong>{location.longitude.toFixed(6)}</strong>
+                </p>
+              </div>
+            )}
 
             {/* Address */}
             <div className="form-group">

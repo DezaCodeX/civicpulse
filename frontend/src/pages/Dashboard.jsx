@@ -1,7 +1,9 @@
-import api from "../services/api";
 import { useEffect, useState } from "react";
 import { LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebase';
+import { getUserProfile } from '../services/firestore';
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
@@ -9,28 +11,69 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get("/api/profile/")
-      .then(res => {
-        setUser(res.data);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Failed to fetch profile", err);
-        // If the token is invalid or expired, API interceptor should handle it.
-        // For an explicit unauthorized error, redirect to login.
-        if (err.response && err.response.status === 401) {
+    const loadUser = async () => {
+      try {
+        const userId = localStorage.getItem('userId');
+        console.log('Dashboard: userId from localStorage:', userId);
+        
+        if (!userId) {
+          console.log('Dashboard: No userId found in localStorage');
           navigate('/login');
+          return;
         }
+
+        const userData = await getUserProfile(userId);
+        console.log('Dashboard: userData from Firestore:', userData);
+        
+        if (userData) {
+          setUser(userData);
+        } else {
+          // User not found in Firestore - create default profile
+          console.log('Dashboard: User profile not found in Firestore, creating default profile');
+          const userEmail = localStorage.getItem('userEmail') || 'user@example.com';
+          setUser({
+            email: userEmail,
+            first_name: userEmail.split('@')[0],
+            last_name: '',
+            phone_number: '',
+            address: '',
+            city: '',
+            state: '',
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch profile", err);
+        console.error("Error details:", err.message, err.code);
+        
+        // Fallback: Create a basic user object from localStorage
+        const userEmail = localStorage.getItem('userEmail') || 'user@example.com';
+        setUser({
+          email: userEmail,
+          first_name: userEmail.split('@')[0],
+          last_name: '',
+          phone_number: '',
+          address: '',
+          city: '',
+          state: '',
+        });
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    loadUser();
   }, [navigate]);
 
-  const handleLogout = () => {
-    // This should be handled by the API service to clear the token
-    // For now, let's simulate it and redirect
-    localStorage.removeItem('access'); // Correct key for access token
-    api.defaults.headers.common['Authorization'] = null;
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      // Clear local storage
+      localStorage.removeItem('userId');
+      localStorage.removeItem('userEmail');
+      navigate('/login');
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
   };
   
   if (loading) {
@@ -44,7 +87,12 @@ const Dashboard = () => {
   if (!user) {
     return (
       <div className="text-center mt-10">
-        <p className="text-red-500">Could not load user data. Please try logging in again.</p>
+        <p className="text-red-500 mb-4">Could not load user data. Please check:</p>
+        <ol className="text-left inline-block text-gray-700 mb-4">
+          <li>✓ Check browser console for error details (Press F12)</li>
+          <li>✓ Verify Firestore database has the user profile</li>
+          <li>✓ Check Firestore security rules allow reads</li>
+        </ol>
         <button onClick={() => navigate('/login')} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
           Go to Login
         </button>

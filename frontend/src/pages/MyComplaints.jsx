@@ -1,13 +1,35 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Plus, AlertCircle } from 'lucide-react'
+import { getUserComplaints } from '../services/firestore'
 
 function MyComplaints() {
   const navigate = useNavigate()
-  const [complaints] = useState([
-    // Complaints will come from backend API
-    // For now, showing empty state
-  ])
+  const [complaints, setComplaints] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const loadComplaints = async () => {
+      try {
+        const userId = localStorage.getItem('userId')
+        if (!userId) {
+          navigate('/login')
+          return
+        }
+
+        const userComplaints = await getUserComplaints(userId)
+        setComplaints(userComplaints || [])
+      } catch (err) {
+        console.error('Failed to fetch complaints:', err)
+        setError('Failed to load complaints.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadComplaints()
+  }, [navigate])
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -59,6 +81,13 @@ function MyComplaints() {
           </button>
         </div>
 
+        {/* Error message if any */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-8">
+            {error}
+          </div>
+        )}
+
         {/* Complaints List or Empty State */}
         {complaints.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-16 text-center">
@@ -91,15 +120,17 @@ function MyComplaints() {
                 <tbody className="divide-y divide-gray-200">
                   {complaints.map(complaint => (
                     <tr key={complaint.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm text-gray-900 font-medium">{complaint.description.substring(0, 50)}...</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{complaint.category}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{complaint.location}</td>
+                      <td className="px-6 py-4 text-sm text-gray-900 font-medium">{complaint.description?.substring(0, 50) || 'N/A'}...</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{complaint.category || 'N/A'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{complaint.location || 'N/A'}</td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(complaint.status)}`}>
-                          {complaint.status.replace('_', ' ').toUpperCase()}
+                          {complaint.status?.replace('_', ' ').toUpperCase() || 'PENDING'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{new Date(complaint.created_at).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {complaint.created_at ? new Date(complaint.created_at.toDate?.() || complaint.created_at).toLocaleDateString() : 'N/A'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
