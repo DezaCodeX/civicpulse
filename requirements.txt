@@ -5,3 +5,5 @@ dotenv
 dj_database_url
 pytest
 pytest-django
+
+django-cors-headers
