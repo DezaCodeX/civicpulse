@@ -178,7 +178,12 @@ def delete_complaint_document(request, complaint_id, document_id):
         document.file.delete()  # Delete the actual file
         document.delete()
         
-        return Response({'message': 'Document deleted successfully'}, status=status.HTTP_200_OK)
+        # Return updated complaint with all remaining documents
+        updated_complaint = ComplaintSerializer(complaint).data
+        return Response({
+            'message': 'Document deleted successfully',
+            'complaint': updated_complaint
+        }, status=status.HTTP_200_OK)
         
     except Complaint.DoesNotExist:
         return Response({'error': 'Complaint not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -191,23 +196,27 @@ def delete_complaint_document(request, complaint_id, document_id):
 # ==================== MODULE 2: MULTIPLE FILE UPLOAD API ====================
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_complaint_with_files(request):
     """
     Create complaint with multiple file uploads.
+    Uses authenticated user. Falls back to Firebase UID lookup if needed.
     Accepts FormData with documents[] array.
     """
     try:
-        # Get user from Firebase UID
-        firebase_uid = request.data.get('firebase_uid')
+        # Use authenticated user if available, otherwise lookup by Firebase UID
+        user = request.user
         
-        if not firebase_uid:
-            return Response({'error': 'Firebase UID required'}, status=400)
-        
-        # Get or create user from Firebase UID
-        user, created = CustomUser.objects.get_or_create(
-            firebase_uid=firebase_uid,
-            defaults={'email': request.data.get('email', f'{firebase_uid}@firebase.local')}
-        )
+        if not user.is_authenticated:
+            firebase_uid = request.data.get('firebase_uid')
+            if not firebase_uid:
+                return Response({'error': 'Firebase UID required when not authenticated'}, status=400)
+            
+            # Get or create user from Firebase UID
+            user, created = CustomUser.objects.get_or_create(
+                firebase_uid=firebase_uid,
+                defaults={'email': request.data.get('email', f'{firebase_uid}@firebase.local')}
+            )
         
         description = request.data.get('description', '')
         title = request.data.get('title', '')
@@ -258,6 +267,9 @@ def create_complaint_with_files(request):
         }, status=status.HTTP_201_CREATED)
     
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error creating complaint: {str(e)}", exc_info=True)
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 

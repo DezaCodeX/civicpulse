@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Plus, AlertCircle, X, FileUp, Download, Trash2, MapPin, User, Calendar, Tag } from 'lucide-react'
+import { ChevronLeft, Plus, AlertCircle, X, FileUp, Download, Trash2, MapPin, User, Calendar, Tag, RefreshCw } from 'lucide-react'
 import api from '../services/api'
 
 function MyComplaints() {
@@ -12,13 +12,27 @@ function MyComplaints() {
   const [showModal, setShowModal] = useState(false)
   const [uploadingFiles, setUploadingFiles] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     loadComplaints()
   }, [navigate])
 
+  // Add visibility listener to refresh data when page becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadComplaints()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
   const loadComplaints = async () => {
     try {
+      setRefreshing(true)
       const token = localStorage.getItem('access')
       if (!token) {
         navigate('/login')
@@ -33,6 +47,7 @@ function MyComplaints() {
       setError('Failed to load complaints.')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -79,8 +94,8 @@ function MyComplaints() {
         }
       )
 
-      // Update the selected complaint with new documents
-      const updatedComplaint = {
+      // Update the selected complaint with ALL documents (from the updated complaint data)
+      const updatedComplaint = response.data.complaint || {
         ...selectedComplaint,
         documents: response.data.documents || [],
       }
@@ -102,12 +117,12 @@ function MyComplaints() {
     if (!selectedComplaint) return
 
     try {
-      await api.delete(
+      const response = await api.delete(
         `/api/complaints/${selectedComplaint.id}/documents/${documentId}/`
       )
 
-      // Update the selected complaint by removing the document
-      const updatedComplaint = {
+      // Update the selected complaint with the updated data from backend
+      const updatedComplaint = response.data.complaint || {
         ...selectedComplaint,
         documents: selectedComplaint.documents.filter(d => d.id !== documentId),
       }
@@ -168,13 +183,23 @@ function MyComplaints() {
             <h1 className="text-3xl font-bold text-gray-900 mb-1">My Complaints</h1>
             <p className="text-gray-600">Track the status of your submissions</p>
           </div>
-          <button
-            onClick={() => navigate('/submit-complaint')}
-            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-          >
-            <Plus size={20} />
-            Submit New Complaint
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={loadComplaints}
+              disabled={refreshing}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+            >
+              <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+            <button
+              onClick={() => navigate('/submit-complaint')}
+              className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+            >
+              <Plus size={20} />
+              Submit New Complaint
+            </button>
+          </div>
         </div>
 
         {/* Error message if any */}
