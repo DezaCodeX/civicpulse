@@ -112,6 +112,82 @@ def complaint_list_create(request):
         return Response(serializer.errors, status=400)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_complaint_documents(request, complaint_id):
+    """
+    Upload documents to an existing complaint.
+    Authenticated users can only upload to their own complaints.
+    """
+    try:
+        complaint = Complaint.objects.get(id=complaint_id)
+        
+        # Check if user owns this complaint
+        if complaint.user != request.user:
+            return Response({'error': 'You can only upload documents to your own complaints'}, status=status.HTTP_403_FORBIDDEN)
+        
+        files = request.FILES.getlist('files')
+        if not files:
+            return Response({'error': 'No files provided'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        documents = []
+        for file in files:
+            doc = ComplaintDocument.objects.create(
+                complaint=complaint,
+                file=file,
+                file_name=file.name,
+                file_size=file.size
+            )
+            documents.append({
+                'id': doc.id,
+                'file_name': doc.file_name,
+                'file_size': doc.file_size,
+                'file': request.build_absolute_uri(doc.file.url),
+                'uploaded_at': doc.uploaded_at.isoformat(),
+            })
+        
+        # Return updated complaint with all documents
+        updated_complaint = ComplaintSerializer(complaint).data
+        return Response({
+            'message': f'{len(documents)} file(s) uploaded successfully',
+            'documents': documents,
+            'complaint': updated_complaint
+        }, status=status.HTTP_201_CREATED)
+        
+    except Complaint.DoesNotExist:
+        return Response({'error': 'Complaint not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_complaint_document(request, complaint_id, document_id):
+    """
+    Delete a specific document from a complaint.
+    Authenticated users can only delete from their own complaints.
+    """
+    try:
+        complaint = Complaint.objects.get(id=complaint_id)
+        
+        # Check if user owns this complaint
+        if complaint.user != request.user:
+            return Response({'error': 'You can only delete documents from your own complaints'}, status=status.HTTP_403_FORBIDDEN)
+        
+        document = ComplaintDocument.objects.get(id=document_id, complaint=complaint)
+        document.file.delete()  # Delete the actual file
+        document.delete()
+        
+        return Response({'message': 'Document deleted successfully'}, status=status.HTTP_200_OK)
+        
+    except Complaint.DoesNotExist:
+        return Response({'error': 'Complaint not found'}, status=status.HTTP_404_NOT_FOUND)
+    except ComplaintDocument.DoesNotExist:
+        return Response({'error': 'Document not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 # ==================== MODULE 2: MULTIPLE FILE UPLOAD API ====================
 
 @api_view(['POST'])

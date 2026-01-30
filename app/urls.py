@@ -3,6 +3,7 @@ from .views import (
     SignupView, user_profile, firebase_login, test_view,
     # Complaint endpoints
     complaint_list_create, create_complaint_with_files,
+    upload_complaint_documents, delete_complaint_document,
     # Public endpoints
     public_complaint_detail, public_complaints_list, support_complaint,
     # Admin endpoints
@@ -21,6 +22,8 @@ urlpatterns = [
     # Complaints - Authenticated
     path('complaints/', complaint_list_create, name='complaint_list_create'),
     path('complaints/create/', create_complaint_with_files, name='create_complaint_with_files'),
+    path('complaints/<str:complaint_id>/upload-documents/', upload_complaint_documents, name='upload_complaint_documents'),
+    path('complaints/<str:complaint_id>/documents/<str:document_id>/', delete_complaint_document, name='delete_complaint_document'),
     
     # Public Endpoints - Anonymous
     path('public/complaints/', public_complaints_list, name='public_complaints_list'),
