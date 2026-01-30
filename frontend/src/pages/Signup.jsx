@@ -76,11 +76,31 @@ function Signup() {
         city: '',
         state: '',
         phone_number: '',
-      })
+      });
 
-      // Store user ID in localStorage for future use
-      localStorage.setItem("userId", userId)
-      localStorage.setItem("userEmail", formData.email)
+      // Call your backend to get the JWT token
+      const response = await fetch("http://127.0.0.1:8000/api/firebase-login/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          uid: userId,
+          email: formData.email,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to authenticate with backend.");
+      }
+
+      const data = await response.json();
+
+      // Store tokens and user info in localStorage
+      localStorage.setItem("access", data.access);
+      localStorage.setItem("refresh", data.refresh);
+      localStorage.setItem("userId", data.user.id);
+      localStorage.setItem("userEmail", data.user.email);
 
       console.log('Signup successful!')
       navigate('/dashboard')
@@ -125,13 +145,33 @@ function Signup() {
         city: '',
         state: '',
         phone_number: '',
-      })
+      });
 
-      // Store user ID in localStorage
-      localStorage.setItem("userId", userId)
-      localStorage.setItem("userEmail", firebaseResult.user.email)
+      // Call your backend to get the JWT token
+      const response = await fetch("http://127.0.0.1:8000/api/firebase-login/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          uid: userId,
+          email: firebaseResult.user.email,
+        }),
+      });
 
-      navigate('/dashboard')
+      if (!response.ok) {
+        throw new Error("Failed to authenticate with backend.");
+      }
+
+      const data = await response.json();
+
+      // Store tokens and user info in localStorage
+      localStorage.setItem("access", data.access);
+      localStorage.setItem("refresh", data.refresh);
+      localStorage.setItem("userId", data.user.id);
+      localStorage.setItem("userEmail", data.user.email);
+
+      navigate('/dashboard');
     } catch (err) {
       console.error('Google signup error:', err)
       setError(err.message || 'Failed to sign up with Google.')

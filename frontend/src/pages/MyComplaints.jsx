@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Plus, AlertCircle } from 'lucide-react'
-import { getUserComplaints } from '../services/firestore'
+import { ChevronLeft, Plus, AlertCircle, FileDown } from 'lucide-react'
+import { api } from '../services/api'
 
 function MyComplaints() {
   const navigate = useNavigate()
@@ -18,8 +18,8 @@ function MyComplaints() {
           return
         }
 
-        const userComplaints = await getUserComplaints(userId)
-        setComplaints(userComplaints || [])
+        const response = await api.get('/api/complaints/')
+        setComplaints(response.data || [])
       } catch (err) {
         console.error('Failed to fetch complaints:', err)
         setError('Failed to load complaints.')
@@ -49,7 +49,7 @@ function MyComplaints() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+        <div data-testid="loading-spinner" className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     )
   }
@@ -114,6 +114,7 @@ function MyComplaints() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Documents</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                   </tr>
                 </thead>
@@ -128,8 +129,31 @@ function MyComplaints() {
                           {complaint.status?.replace('_', ' ').toUpperCase() || 'PENDING'}
                         </span>
                       </td>
+                      <td className="px-6 py-4">
+                        {complaint.documents && complaint.documents.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {complaint.documents.slice(0, 2).map((doc, index) => (
+                              <a
+                                key={doc.id}
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100 transition-colors"
+                              >
+                                <FileDown size={12} />
+                                {doc.name.length > 15 ? `${doc.name.substring(0, 15)}...` : doc.name}
+                              </a>
+                            ))}
+                            {complaint.documents.length > 2 && (
+                              <span className="text-xs text-gray-500">+{complaint.documents.length - 2} more</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">No documents</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {complaint.created_at ? new Date(complaint.created_at.toDate?.() || complaint.created_at).toLocaleDateString() : 'N/A'}
+                        {complaint.created_at ? new Date(complaint.created_at).toLocaleDateString() : 'N/A'}
                       </td>
                     </tr>
                   ))}

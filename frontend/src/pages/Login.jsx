@@ -22,11 +22,31 @@ const Login = () => {
 
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
-      const userId = result.user.uid;
+      const user = result.user;
 
-      // Store user ID in localStorage
-      localStorage.setItem("userId", userId);
-      localStorage.setItem("userEmail", result.user.email);
+      // Call your backend to get the JWT token
+      const response = await fetch("http://127.0.0.1:8000/api/firebase-login/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to authenticate with backend.");
+      }
+
+      const data = await response.json();
+
+      // Store tokens and user info in localStorage
+      localStorage.setItem("access", data.access);
+      localStorage.setItem("refresh", data.refresh);
+      localStorage.setItem("userId", data.user.id);
+      localStorage.setItem("userEmail", data.user.email);
 
       if (isAdmin) {
         navigate("/admin");
@@ -61,11 +81,31 @@ const Login = () => {
 
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      const userId = result.user.uid;
+      const user = result.user;
 
-      // Store user ID in localStorage
-      localStorage.setItem("userId", userId);
-      localStorage.setItem("userEmail", result.user.email);
+      // Call your backend to get the JWT token
+      const response = await fetch("http://127.0.0.1:8000/api/firebase-login/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to authenticate with backend.");
+      }
+
+      const data = await response.json();
+
+      // Store tokens and user info in localStorage
+      localStorage.setItem("access", data.access);
+      localStorage.setItem("refresh", data.refresh);
+      localStorage.setItem("userId", data.user.id);
+      localStorage.setItem("userEmail", data.user.email);
 
       navigate("/dashboard");
     } catch (err) {
