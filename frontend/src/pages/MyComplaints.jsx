@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Plus, AlertCircle } from 'lucide-react'
-import { getUserComplaints } from '../services/firestore'
+import api from '../services/api'
 
 function MyComplaints() {
   const navigate = useNavigate()
@@ -12,14 +12,14 @@ function MyComplaints() {
   useEffect(() => {
     const loadComplaints = async () => {
       try {
-        const userId = localStorage.getItem('userId')
-        if (!userId) {
+        const token = localStorage.getItem('access')
+        if (!token) {
           navigate('/login')
           return
         }
 
-        const userComplaints = await getUserComplaints(userId)
-        setComplaints(userComplaints || [])
+        const response = await api.get('/api/complaints/')
+        setComplaints(response.data || [])
       } catch (err) {
         console.error('Failed to fetch complaints:', err)
         setError('Failed to load complaints.')

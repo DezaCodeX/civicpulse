@@ -23,10 +23,34 @@ const Login = () => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const userId = result.user.uid;
+      const userEmail = result.user.email;
 
       // Store user ID in localStorage
       localStorage.setItem("userId", userId);
-      localStorage.setItem("userEmail", result.user.email);
+      localStorage.setItem("userEmail", userEmail);
+
+      // Call backend to sync user
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/firebase-login/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: userId,
+            email: userEmail,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Store JWT tokens
+          localStorage.setItem('access', data.access);
+          localStorage.setItem('refresh', data.refresh);
+        }
+      } catch (apiErr) {
+        console.error('Backend sync error:', apiErr);
+      }
 
       if (isAdmin) {
         navigate("/admin");
@@ -62,10 +86,34 @@ const Login = () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const userId = result.user.uid;
+      const userEmail = result.user.email;
 
-      // Store user ID in localStorage
+      // Store user ID and email in localStorage
       localStorage.setItem("userId", userId);
-      localStorage.setItem("userEmail", result.user.email);
+      localStorage.setItem("userEmail", userEmail);
+
+      // Call backend to sync user with Firebase
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/firebase-login/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: userId,
+            email: userEmail,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Store JWT tokens
+          localStorage.setItem('access', data.access);
+          localStorage.setItem('refresh', data.refresh);
+        }
+      } catch (apiErr) {
+        console.error('Backend sync error:', apiErr);
+      }
 
       navigate("/dashboard");
     } catch (err) {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Home, Phone, MapPin, Building, Navigation } from 'lucide-react';
 import { getUserProfile, updateUserProfile } from '../services/firestore';
+import { auth } from '../firebase';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -35,20 +36,22 @@ const Profile = () => {
         }
 
         const userData = await getUserProfile(userId);
+        const currentUser = auth.currentUser;
+        const firebaseEmail = currentUser?.email || localStorage.getItem('userEmail') || '';
+
         if (userData) {
           setProfile({
             first_name: userData.first_name || '',
             last_name: userData.last_name || '',
-            email: userData.email || '',
+            email: firebaseEmail,
             address: userData.address || '',
             city: userData.city || '',
             state: userData.state || '',
             phone_number: userData.phone_number || '',
           });
         } else {
-          // New user - just set email
-          const userEmail = localStorage.getItem('userEmail') || '';
-          setProfile(prev => ({ ...prev, email: userEmail }));
+          // New user - just set email from Firebase
+          setProfile(prev => ({ ...prev, email: firebaseEmail }));
         }
         setLoading(false);
       } catch (err) {

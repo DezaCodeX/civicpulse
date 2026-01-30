@@ -23,17 +23,22 @@ const Dashboard = () => {
         }
 
         const userData = await getUserProfile(userId);
+        const currentUser = auth.currentUser;
+        const firebaseEmail = currentUser?.email || localStorage.getItem('userEmail') || 'user@example.com';
+        
         console.log('Dashboard: userData from Firestore:', userData);
         
         if (userData) {
-          setUser(userData);
+          setUser({
+            ...userData,
+            email: firebaseEmail,
+          });
         } else {
           // User not found in Firestore - create default profile
           console.log('Dashboard: User profile not found in Firestore, creating default profile');
-          const userEmail = localStorage.getItem('userEmail') || 'user@example.com';
           setUser({
-            email: userEmail,
-            first_name: userEmail.split('@')[0],
+            email: firebaseEmail,
+            first_name: firebaseEmail.split('@')[0],
             last_name: '',
             phone_number: '',
             address: '',
@@ -45,8 +50,9 @@ const Dashboard = () => {
         console.error("Failed to fetch profile", err);
         console.error("Error details:", err.message, err.code);
         
-        // Fallback: Create a basic user object from localStorage
-        const userEmail = localStorage.getItem('userEmail') || 'user@example.com';
+        // Fallback: Create a basic user object from Firebase auth
+        const currentUser = auth.currentUser;
+        const userEmail = currentUser?.email || localStorage.getItem('userEmail') || 'user@example.com';
         setUser({
           email: userEmail,
           first_name: userEmail.split('@')[0],

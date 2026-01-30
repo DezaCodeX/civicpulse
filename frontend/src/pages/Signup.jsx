@@ -82,6 +82,29 @@ function Signup() {
       localStorage.setItem("userId", userId)
       localStorage.setItem("userEmail", formData.email)
 
+      // Sync with backend
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/firebase-login/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: userId,
+            email: formData.email,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Store JWT tokens
+          localStorage.setItem('access', data.access);
+          localStorage.setItem('refresh', data.refresh);
+        }
+      } catch (apiErr) {
+        console.error('Backend sync error:', apiErr);
+      }
+
       console.log('Signup successful!')
       navigate('/dashboard')
     } catch (err) {
@@ -130,6 +153,29 @@ function Signup() {
       // Store user ID in localStorage
       localStorage.setItem("userId", userId)
       localStorage.setItem("userEmail", firebaseResult.user.email)
+
+      // Sync with backend
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/firebase-login/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: userId,
+            email: firebaseResult.user.email,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Store JWT tokens
+          localStorage.setItem('access', data.access);
+          localStorage.setItem('refresh', data.refresh);
+        }
+      } catch (apiErr) {
+        console.error('Backend sync error:', apiErr);
+      }
 
       navigate('/dashboard')
     } catch (err) {
