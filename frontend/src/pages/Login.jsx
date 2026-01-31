@@ -22,31 +22,35 @@ const Login = () => {
 
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
-      const user = result.user;
+      const userId = result.user.uid;
+      const userEmail = result.user.email;
 
-      // Call your backend to get the JWT token
-      const response = await fetch("http://127.0.0.1:8000/api/firebase-login/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-        }),
-      });
+      // Store user ID in localStorage
+      localStorage.setItem("userId", userId);
+      localStorage.setItem("userEmail", userEmail);
 
-      if (!response.ok) {
-        throw new Error("Failed to authenticate with backend.");
+      // Call backend to sync user
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/firebase-login/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: userId,
+            email: userEmail,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Store JWT tokens
+          localStorage.setItem('access', data.access);
+          localStorage.setItem('refresh', data.refresh);
+        }
+      } catch (apiErr) {
+        console.error('Backend sync error:', apiErr);
       }
-
-      const data = await response.json();
-
-      // Store tokens and user info in localStorage
-      localStorage.setItem("access", data.access);
-      localStorage.setItem("refresh", data.refresh);
-      localStorage.setItem("userId", data.user.id);
-      localStorage.setItem("userEmail", data.user.email);
 
       if (isAdmin) {
         navigate("/admin");
@@ -81,31 +85,35 @@ const Login = () => {
 
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+      const userId = result.user.uid;
+      const userEmail = result.user.email;
 
-      // Call your backend to get the JWT token
-      const response = await fetch("http://127.0.0.1:8000/api/firebase-login/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-        }),
-      });
+      // Store user ID and email in localStorage
+      localStorage.setItem("userId", userId);
+      localStorage.setItem("userEmail", userEmail);
 
-      if (!response.ok) {
-        throw new Error("Failed to authenticate with backend.");
+      // Call backend to sync user with Firebase
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/firebase-login/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: userId,
+            email: userEmail,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Store JWT tokens
+          localStorage.setItem('access', data.access);
+          localStorage.setItem('refresh', data.refresh);
+        }
+      } catch (apiErr) {
+        console.error('Backend sync error:', apiErr);
       }
-
-      const data = await response.json();
-
-      // Store tokens and user info in localStorage
-      localStorage.setItem("access", data.access);
-      localStorage.setItem("refresh", data.refresh);
-      localStorage.setItem("userId", data.user.id);
-      localStorage.setItem("userEmail", data.user.email);
 
       navigate("/dashboard");
     } catch (err) {
