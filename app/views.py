@@ -112,26 +112,111 @@ def complaint_list_create(request):
         return Response(serializer.errors, status=400)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_complaint_documents(request, complaint_id):
+    """
+    Upload documents to an existing complaint.
+    Authenticated users can only upload to their own complaints.
+    """
+    try:
+        complaint = Complaint.objects.get(id=complaint_id)
+        
+        # Check if user owns this complaint
+        if complaint.user != request.user:
+            return Response({'error': 'You can only upload documents to your own complaints'}, status=status.HTTP_403_FORBIDDEN)
+        
+        files = request.FILES.getlist('files')
+        if not files:
+            return Response({'error': 'No files provided'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        documents = []
+        for file in files:
+            doc = ComplaintDocument.objects.create(
+                complaint=complaint,
+                file=file,
+                file_name=file.name,
+                file_size=file.size
+            )
+            documents.append({
+                'id': doc.id,
+                'file_name': doc.file_name,
+                'file_size': doc.file_size,
+                'file': request.build_absolute_uri(doc.file.url),
+                'uploaded_at': doc.uploaded_at.isoformat(),
+            })
+        
+        # Return updated complaint with all documents
+        updated_complaint = ComplaintSerializer(complaint).data
+        return Response({
+            'message': f'{len(documents)} file(s) uploaded successfully',
+            'documents': documents,
+            'complaint': updated_complaint
+        }, status=status.HTTP_201_CREATED)
+        
+    except Complaint.DoesNotExist:
+        return Response({'error': 'Complaint not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_complaint_document(request, complaint_id, document_id):
+    """
+    Delete a specific document from a complaint.
+    Authenticated users can only delete from their own complaints.
+    """
+    try:
+        complaint = Complaint.objects.get(id=complaint_id)
+        
+        # Check if user owns this complaint
+        if complaint.user != request.user:
+            return Response({'error': 'You can only delete documents from your own complaints'}, status=status.HTTP_403_FORBIDDEN)
+        
+        document = ComplaintDocument.objects.get(id=document_id, complaint=complaint)
+        document.file.delete()  # Delete the actual file
+        document.delete()
+        
+        # Return updated complaint with all remaining documents
+        updated_complaint = ComplaintSerializer(complaint).data
+        return Response({
+            'message': 'Document deleted successfully',
+            'complaint': updated_complaint
+        }, status=status.HTTP_200_OK)
+        
+    except Complaint.DoesNotExist:
+        return Response({'error': 'Complaint not found'}, status=status.HTTP_404_NOT_FOUND)
+    except ComplaintDocument.DoesNotExist:
+        return Response({'error': 'Document not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 # ==================== MODULE 2: MULTIPLE FILE UPLOAD API ====================
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_complaint_with_files(request):
     """
     Create complaint with multiple file uploads.
+    Uses authenticated user. Falls back to Firebase UID lookup if needed.
     Accepts FormData with documents[] array.
     """
     try:
-        # Get user from Firebase UID
-        firebase_uid = request.data.get('firebase_uid')
+        # Use authenticated user if available, otherwise lookup by Firebase UID
+        user = request.user
         
-        if not firebase_uid:
-            return Response({'error': 'Firebase UID required'}, status=400)
-        
-        # Get or create user from Firebase UID
-        user, created = CustomUser.objects.get_or_create(
-            firebase_uid=firebase_uid,
-            defaults={'email': request.data.get('email', f'{firebase_uid}@firebase.local')}
-        )
+        if not user.is_authenticated:
+            firebase_uid = request.data.get('firebase_uid')
+            if not firebase_uid:
+                return Response({'error': 'Firebase UID required when not authenticated'}, status=400)
+            
+            # Get or create user from Firebase UID
+            user, created = CustomUser.objects.get_or_create(
+                firebase_uid=firebase_uid,
+                defaults={'email': request.data.get('email', f'{firebase_uid}@firebase.local')}
+            )
         
         description = request.data.get('description', '')
         title = request.data.get('title', '')
@@ -182,6 +267,9 @@ def create_complaint_with_files(request):
         }, status=status.HTTP_201_CREATED)
     
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error creating complaint: {str(e)}", exc_info=True)
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
