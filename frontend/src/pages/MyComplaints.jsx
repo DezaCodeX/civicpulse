@@ -1,35 +1,55 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Plus, AlertCircle, FileDown } from 'lucide-react'
-import { api } from '../services/api'
+import { ChevronLeft, Plus, AlertCircle, X, FileUp, Download, Trash2, MapPin, User, Calendar, Tag, RefreshCw } from 'lucide-react'
+import api from '../services/api'
 
 function MyComplaints() {
   const navigate = useNavigate()
   const [complaints, setComplaints] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedComplaint, setSelectedComplaint] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [uploadingFiles, setUploadingFiles] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
-    const loadComplaints = async () => {
-      try {
-        const userId = localStorage.getItem('userId')
-        if (!userId) {
-          navigate('/login')
-          return
-        }
+    loadComplaints()
+  }, [navigate])
 
-        const response = await api.get('/api/complaints/')
-        setComplaints(response.data || [])
-      } catch (err) {
-        console.error('Failed to fetch complaints:', err)
-        setError('Failed to load complaints.')
-      } finally {
-        setLoading(false)
+  // Add visibility listener to refresh data when page becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadComplaints()
       }
     }
 
-    loadComplaints()
-  }, [navigate])
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
+  const loadComplaints = async () => {
+    try {
+      setRefreshing(true)
+      const token = localStorage.getItem('access')
+      if (!token) {
+        navigate('/login')
+        return
+      }
+
+      const response = await api.get('/api/complaints/')
+      setComplaints(response.data || [])
+      setError('')
+    } catch (err) {
+      console.error('Failed to fetch complaints:', err)
+      setError('Failed to load complaints.')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -46,17 +66,108 @@ function MyComplaints() {
     }
   }
 
+  const handleViewDetails = (complaint) => {
+    setSelectedComplaint(complaint)
+    setShowModal(true)
+  }
+
+  const handleFileUpload = async (e) => {
+    const files = e.target.files
+    if (!files || !selectedComplaint) return
+
+    setUploadingFiles(true)
+    setDeleteError('')
+
+    try {
+      const formData = new FormData()
+      for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i])
+      }
+
+      const response = await api.post(
+        `/api/complaints/${selectedComplaint.id}/upload-documents/`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      )
+
+      // Update the selected complaint with ALL documents (from the updated complaint data)
+      const updatedComplaint = response.data.complaint || {
+        ...selectedComplaint,
+        documents: response.data.documents || [],
+      }
+      setSelectedComplaint(updatedComplaint)
+
+      // Update the complaints list
+      setComplaints(
+        complaints.map(c => (c.id === selectedComplaint.id ? updatedComplaint : c))
+      )
+    } catch (err) {
+      console.error('File upload failed:', err)
+      setDeleteError('Failed to upload files. Please try again.')
+    } finally {
+      setUploadingFiles(false)
+    }
+  }
+
+  const handleDeleteDocument = async (documentId) => {
+    if (!selectedComplaint) return
+
+    try {
+      const response = await api.delete(
+        `/api/complaints/${selectedComplaint.id}/documents/${documentId}/`
+      )
+
+      // Update the selected complaint with the updated data from backend
+      const updatedComplaint = response.data.complaint || {
+        ...selectedComplaint,
+        documents: selectedComplaint.documents.filter(d => d.id !== documentId),
+      }
+      setSelectedComplaint(updatedComplaint)
+
+      // Update the complaints list
+      setComplaints(
+        complaints.map(c => (c.id === selectedComplaint.id ? updatedComplaint : c))
+      )
+    } catch (err) {
+      console.error('Failed to delete document:', err)
+      setDeleteError('Failed to delete document. Please try again.')
+    }
+  }
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+  }
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div data-testid="loading-spinner" className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {/* Back Button */}
         <button
           onClick={() => navigate(-1)}
@@ -72,13 +183,23 @@ function MyComplaints() {
             <h1 className="text-3xl font-bold text-gray-900 mb-1">My Complaints</h1>
             <p className="text-gray-600">Track the status of your submissions</p>
           </div>
-          <button
-            onClick={() => navigate('/submit-complaint')}
-            className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-          >
-            <Plus size={20} />
-            Submit New Complaint
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={loadComplaints}
+              disabled={refreshing}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+            >
+              <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+            <button
+              onClick={() => navigate('/submit-complaint')}
+              className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+            >
+              <Plus size={20} />
+              Submit New Complaint
+            </button>
+          </div>
         </div>
 
         {/* Error message if any */}
@@ -105,64 +226,205 @@ function MyComplaints() {
             </button>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Documents</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {complaints.map(complaint => (
-                    <tr key={complaint.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm text-gray-900 font-medium">{complaint.description?.substring(0, 50) || 'N/A'}...</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{complaint.category || 'N/A'}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{complaint.location || 'N/A'}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(complaint.status)}`}>
-                          {complaint.status?.replace('_', ' ').toUpperCase() || 'PENDING'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {complaint.documents && complaint.documents.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {complaint.documents.slice(0, 2).map((doc, index) => (
-                              <a
-                                key={doc.id}
-                                href={doc.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs hover:bg-blue-100 transition-colors"
-                              >
-                                <FileDown size={12} />
-                                {doc.name.length > 15 ? `${doc.name.substring(0, 15)}...` : doc.name}
-                              </a>
-                            ))}
-                            {complaint.documents.length > 2 && (
-                              <span className="text-xs text-gray-500">+{complaint.documents.length - 2} more</span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">No documents</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {complaint.created_at ? new Date(complaint.created_at).toLocaleDateString() : 'N/A'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <div className="grid gap-6">
+            {complaints.map(complaint => (
+              <div
+                key={complaint.id}
+                className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => handleViewDetails(complaint)}
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      {complaint.title || 'Untitled Complaint'}
+                    </h3>
+                    <p className="text-gray-600 mb-3">{complaint.description?.substring(0, 100)}...</p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ml-4 ${getStatusColor(complaint.status)}`}>
+                    {complaint.status?.replace('_', ' ').toUpperCase() || 'PENDING'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Tag size={16} />
+                    <span>{complaint.category || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <MapPin size={16} />
+                    <span>{complaint.location?.substring(0, 20) || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Calendar size={16} />
+                    <span>{formatDate(complaint.created_at)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <FileUp size={16} />
+                    <span>{complaint.documents?.length || 0} files</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
+
+      {/* Detail Modal */}
+      {showModal && selectedComplaint && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-start">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">{selectedComplaint.title}</h2>
+                <p className="text-gray-600 mt-1">Complaint ID: #{selectedComplaint.id}</p>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Status */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase">Status</h3>
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(selectedComplaint.status)}`}>
+                  {selectedComplaint.status?.replace('_', ' ').toUpperCase()}
+                </span>
+              </div>
+
+              {/* Description */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase">Description</h3>
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{selectedComplaint.description}</p>
+              </div>
+
+              {/* Details Grid */}
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase">Category</h3>
+                  <p className="text-gray-700">{selectedComplaint.category || 'N/A'}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase">Department</h3>
+                  <p className="text-gray-700">{selectedComplaint.department || 'N/A'}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase">Location</h3>
+                  <p className="text-gray-700">{selectedComplaint.location || 'N/A'}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase">Support Count</h3>
+                  <p className="text-gray-700">{selectedComplaint.support_count || 0}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase">Submitted</h3>
+                  <p className="text-gray-700">{formatDate(selectedComplaint.created_at)}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase">Last Updated</h3>
+                  <p className="text-gray-700">{formatDate(selectedComplaint.updated_at)}</p>
+                </div>
+              </div>
+
+              {/* Location Details */}
+              {selectedComplaint.latitude && selectedComplaint.longitude && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2 uppercase">Coordinates</h3>
+                  <p className="text-gray-700">
+                    Latitude: {selectedComplaint.latitude.toFixed(4)}, Longitude: {selectedComplaint.longitude.toFixed(4)}
+                  </p>
+                </div>
+              )}
+
+              {/* Documents Section */}
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Attached Files</h3>
+
+                {deleteError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                    {deleteError}
+                  </div>
+                )}
+
+                {/* File Upload */}
+                <div className="mb-6">
+                  <label className="flex items-center justify-center w-full p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition-colors cursor-pointer bg-gray-50 hover:bg-blue-50">
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleFileUpload}
+                      disabled={uploadingFiles}
+                      className="hidden"
+                      accept="*"
+                    />
+                    <div className="text-center">
+                      <FileUp size={24} className="mx-auto text-gray-400 mb-2" />
+                      <p className="text-sm font-medium text-gray-700">
+                        {uploadingFiles ? 'Uploading...' : 'Click to upload or drag and drop'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">PNG, JPG, PDF, DOC and other files up to 25MB</p>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Files List */}
+                {selectedComplaint.documents && selectedComplaint.documents.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedComplaint.documents.map(doc => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <FileUp size={20} className="text-blue-500 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{doc.file_name}</p>
+                            <p className="text-xs text-gray-500">{formatFileSize(doc.file_size)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                          <a
+                            href={doc.file}
+                            download={doc.file_name}
+                            className="p-2 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                            title="Download file"
+                          >
+                            <Download size={18} />
+                          </a>
+                          <button
+                            onClick={() => handleDeleteDocument(doc.id)}
+                            className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
+                            title="Delete file"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-500 py-4">No files attached yet</p>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-gray-200 p-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
