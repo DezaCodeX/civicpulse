@@ -10,6 +10,9 @@ from django.utils import timezone
 from datetime import timedelta
 import json
 
+# Import AI prediction module
+from app.ai.predict import predict_department
+
 class MyTokenObtainPairView(TokenObtainPairView):
     permission_classes = (AllowAny,)
     serializer_class = MyTokenObtainPairSerializer
@@ -105,10 +108,22 @@ def complaint_list_create(request):
         serializer = ComplaintSerializer(complaints, many=True)
         return Response(serializer.data)
     elif request.method == 'POST':
-        serializer = ComplaintSerializer(data=request.data)
+        # Get description for AI prediction
+        description = request.data.get('description', '')
+        
+        # 🤖 AI-based department prediction
+        predicted_dept, confidence = predict_department(description, return_confidence=True)
+        
+        # Create complaint with AI-predicted department
+        data = request.data.copy()
+        data['department'] = predicted_dept
+        
+        serializer = ComplaintSerializer(data=data)
         if serializer.is_valid():
             serializer.save(user=request.user)
-            return Response(serializer.data, status=201)
+            response_data = serializer.data
+            response_data['confidence'] = round(float(confidence), 3)
+            return Response(response_data, status=201)
         return Response(serializer.errors, status=400)
 
 
@@ -202,6 +217,7 @@ def create_complaint_with_files(request):
     Create complaint with multiple file uploads.
     Uses authenticated user. Falls back to Firebase UID lookup if needed.
     Accepts FormData with documents[] array.
+    AI-based department prediction with confidence score.
     """
     try:
         # Use authenticated user if available, otherwise lookup by Firebase UID
@@ -225,8 +241,8 @@ def create_complaint_with_files(request):
         longitude = request.data.get('longitude')
         location = request.data.get('location', '')
         
-        # AI-based department prediction (placeholder)
-        department = predict_department(description)
+        # 🤖 AI-based department prediction with confidence score
+        department, confidence = predict_department(description, return_confidence=True)
         
         # Create complaint
         complaint = Complaint.objects.create(
@@ -262,6 +278,7 @@ def create_complaint_with_files(request):
             'id': str(complaint.id),
             'title': complaint.title,
             'department': department,
+            'confidence': round(float(confidence), 3),  # 3 decimal places
             'documents': file_urls,
             'message': 'Complaint created successfully'
         }, status=status.HTTP_201_CREATED)
@@ -521,29 +538,9 @@ def analytics_geographic(request):
 
 # ==================== HELPER FUNCTIONS ====================
 
-def predict_department(description):
-    """
-    AI-based department classification.
-    Currently using simple keyword matching.
-    TODO: Integrate with ML model (BERT, GPT-2, etc.)
-    """
-    keywords = {
-        'Water': ['water', 'pipe', 'leak', 'supply', 'sewage'],
-        'Roads': ['road', 'pothole', 'pavement', 'street', 'traffic'],
-        'Electricity': ['electricity', 'power', 'light', 'pole', 'blackout'],
-        'Sanitation': ['garbage', 'waste', 'cleaning', 'dustbin', 'hygiene'],
-        'Health': ['hospital', 'clinic', 'health', 'medical', 'doctor'],
-        'Education': ['school', 'college', 'university', 'education'],
-        'Safety': ['police', 'crime', 'security', 'safety', 'accident'],
-    }
-    
-    description_lower = description.lower()
-    
-    for department, keywords_list in keywords.items():
-        for keyword in keywords_list:
-            if keyword in description_lower:
-                return department
-    
-    return 'General'
+# NOTE: Department prediction is now handled by AI module
+# See: app/ai/predict.py for predict_department() function
+# This provides ML-based prediction with confidence scores
+
 
 
