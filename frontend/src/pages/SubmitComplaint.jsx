@@ -8,7 +8,6 @@ function SubmitComplaint() {
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     title: '',
-    category: '',
     location: '',
     description: '',
     latitude: null,
@@ -65,17 +64,7 @@ function SubmitComplaint() {
     }
   }, [navigate])
 
-  const categories = [
-    'Roads & Infrastructure',
-    'Water Supply',
-    'Electricity',
-    'Sanitation',
-    'Traffic',
-    'Public Safety',
-    'Health Services',
-    'Education',
-    'Other',
-  ]
+
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -104,7 +93,7 @@ function SubmitComplaint() {
       return
     }
 
-    if (!formData.title || !formData.category || !formData.location || !formData.description) {
+    if (!formData.title || !formData.location || !formData.description) {
       setError('Please fill in all required fields')
       return
     }
@@ -124,7 +113,6 @@ function SubmitComplaint() {
       // Prepare FormData for file upload
       const submitData = new FormData()
       submitData.append('title', formData.title)
-      submitData.append('category', formData.category)
       submitData.append('location', formData.location)
       submitData.append('description', formData.description)
       submitData.append('latitude', formData.latitude || '')
@@ -147,7 +135,6 @@ function SubmitComplaint() {
       // Also save to Firestore for React state management
       const complaintData = {
         title: formData.title,
-        category: formData.category,
         location: formData.location,
         description: formData.description,
         latitude: formData.latitude,
@@ -160,7 +147,6 @@ function SubmitComplaint() {
       // Reset form
       setFormData({
         title: '',
-        category: '',
         location: '',
         description: '',
         latitude: null,
@@ -258,24 +244,6 @@ function SubmitComplaint() {
                   placeholder="Brief title of the complaint"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-              </div>
-
-              {/* Category */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select a category</option>
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
               </div>
 
               {/* Location */}

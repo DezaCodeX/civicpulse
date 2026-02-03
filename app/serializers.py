@@ -21,13 +21,13 @@ class ComplaintSerializer(serializers.ModelSerializer):
         fields = ('id', 'title', 'description', 'category', 'department', 'latitude', 
                   'longitude', 'location', 'status', 'support_count', 'is_public', 
                   'documents', 'user', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'department', 'support_count', 'user', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'category', 'department', 'support_count', 'user', 'created_at', 'updated_at')
 
 class ComplaintCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating complaints (handles file uploads separately)"""
     class Meta:
         model = Complaint
-        fields = ('title', 'description', 'category', 'latitude', 'longitude', 'location')
+        fields = ('title', 'description', 'latitude', 'longitude', 'location')
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True)

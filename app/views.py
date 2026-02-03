@@ -41,6 +41,7 @@ def firebase_login(request):
     """
     Firebase login endpoint.
     Expects Firebase UID and email in the request body.
+    Returns JWT tokens for authenticated requests.
     """
     try:
         import logging
@@ -114,9 +115,10 @@ def complaint_list_create(request):
         # 🤖 AI-based department prediction
         predicted_dept, confidence = predict_department(description, return_confidence=True)
         
-        # Create complaint with AI-predicted department
+        # Create complaint with AI-predicted department and category
         data = request.data.copy()
         data['department'] = predicted_dept
+        data['category'] = predicted_dept  # Category auto-filled by AI
         
         serializer = ComplaintSerializer(data=data)
         if serializer.is_valid():
@@ -211,11 +213,11 @@ def delete_complaint_document(request, complaint_id, document_id):
 # ==================== MODULE 2: MULTIPLE FILE UPLOAD API ====================
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])  # Allow firebase_uid as fallback
 def create_complaint_with_files(request):
     """
     Create complaint with multiple file uploads.
-    Uses authenticated user. Falls back to Firebase UID lookup if needed.
+    Supports authenticated users (Bearer token) OR Firebase UID fallback.
     Accepts FormData with documents[] array.
     AI-based department prediction with confidence score.
     """
@@ -236,7 +238,6 @@ def create_complaint_with_files(request):
         
         description = request.data.get('description', '')
         title = request.data.get('title', '')
-        category = request.data.get('category', '')
         latitude = request.data.get('latitude')
         longitude = request.data.get('longitude')
         location = request.data.get('location', '')
@@ -244,12 +245,12 @@ def create_complaint_with_files(request):
         # 🤖 AI-based department prediction with confidence score
         department, confidence = predict_department(description, return_confidence=True)
         
-        # Create complaint
+        # Create complaint (category auto-filled by AI)
         complaint = Complaint.objects.create(
             user=user,
             title=title,
             description=description,
-            category=category,
+            category=department,  # Category auto-filled by AI = department
             department=department,
             latitude=latitude,
             longitude=longitude,
