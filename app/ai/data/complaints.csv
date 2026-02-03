@@ -1,0 +1,70 @@
+text,department
+"No water supply for 3 days",Water
+"Pipeline leakage near my house",Water
+"Tap water is not coming",Water
+"Water pressure is very low",Water
+"Sewage overflow in street",Water
+"Underground pipe burst",Water
+"No drinking water in colony",Water
+"Water stored in tanker is contaminated",Water
+"Street lights not working",Electricity
+"Power cut every night",Electricity
+"Street light is broken",Electricity
+"Electricity pole is damaged",Electricity
+"Power supply is unstable",Electricity
+"Transformer catching fire",Electricity
+"High voltage wires touching tree",Electricity
+"Electricity bill is very high",Electricity
+"Street light damaged near school",Electricity
+"Power transformer making noise",Electricity
+"Potholes on main road",Roads
+"Road damaged after rain",Roads
+"Street is full of cracks",Roads
+"Manhole cover is missing",Roads
+"Broken asphalt on highway",Roads
+"Traffic light not working",Roads
+"Street signs are stolen",Roads
+"Road surface is uneven",Roads
+"Loose tiles on road",Roads
+"Speed breaker damaged",Roads
+"Garbage not collected for days",Sanitation
+"Open drainage causing smell",Sanitation
+"Waste scattered on street",Sanitation
+"Litter bins are overflowing",Sanitation
+"No sweeping in colony",Sanitation
+"Dirty stagnant water on road",Sanitation
+"Dead animals on roadside",Sanitation
+"Plastic bags piled up everywhere",Sanitation
+"Street is not clean",Sanitation
+"Hospital staff not responding",Health
+"Government hospital is overcrowded",Health
+"Clinic needs better facilities",Health
+"Hospital is dirty and unhygienic",Health
+"No doctors available at night",Health
+"Ambulance service is not working",Health
+"Medical waste on hospital ground",Health
+"Healthcare workers are rude",Health
+"No medicines in hospital",Health
+"Theft cases increasing",Public Safety
+"Street crime at night",Public Safety
+"Police not responding to complaints",Public Safety
+"Robbery happened on street",Public Safety
+"Street lighting needed for safety",Public Safety
+"Assault case on main road",Public Safety
+"Pickpocketing is common here",Public Safety
+"No police patrol at night",Public Safety
+"Accident on highway",Public Safety
+"School building is unsafe",Education
+"Teacher shortage in school",Education
+"School has no drinking water",Education
+"Classroom roof is leaking",Education
+"School gates are broken",Education
+"No playground facilities",Education
+"Blackboard is broken",Education
+"School building needs repair",Education
+"College lacks basic facilities",Education
+"No proper desks and chairs",Education
+"Unknown issue needs attention",Other
+"Problem with government services",Other
+"General complaint about city",Other
+"Miscellaneous issue",Other
