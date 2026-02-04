@@ -8,8 +8,12 @@ from .views import (
     public_complaint_detail, public_complaints_list, support_complaint,
     # Admin endpoints
     admin_complaints_list, admin_update_complaint_status,
+    # Volunteer / Tracking
+    volunteer_complaints, upload_verification_image, verify_complaint, track_complaint,
     # Analytics endpoints
-    analytics_dashboard, analytics_geographic
+    analytics_dashboard, analytics_geographic,
+    # Phase 4
+    get_civic_contacts, escalate_complaint, export_complaint_csv, export_complaint_pdf
 )
 
 urlpatterns = [
@@ -29,6 +33,18 @@ urlpatterns = [
     path('public/complaints/', public_complaints_list, name='public_complaints_list'),
     path('public/complaints/<str:complaint_id>/', public_complaint_detail, name='public_complaint_detail'),
     path('complaints/<str:complaint_id>/support/', support_complaint, name='support_complaint'),
+    # Volunteer Endpoints
+    path('volunteer/complaints/', volunteer_complaints, name='volunteer_complaints'),
+    path('volunteer/complaints/<str:complaint_id>/upload-image/', upload_verification_image, name='upload_verification_image'),
+    path('volunteer/complaints/<str:complaint_id>/verify/', verify_complaint, name='verify_complaint'),
+    path('volunteer/complaints/<str:complaint_id>/escalate/', escalate_complaint, name='escalate_complaint'),
+    # Tracking
+    path('track/', track_complaint, name='track_complaint'),
+    # Contact Suggestion
+    path('contacts/', get_civic_contacts, name='get_civic_contacts'),
+    # Export
+    path('complaints/<str:complaint_id>/export/csv/', export_complaint_csv, name='export_complaint_csv'),
+    path('complaints/<str:complaint_id>/export/pdf/', export_complaint_pdf, name='export_complaint_pdf'),
     
     # Admin Endpoints
     path('admin/complaints/', admin_complaints_list, name='admin_complaints_list'),

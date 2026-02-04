@@ -19,6 +19,7 @@ function SubmitComplaint() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [profileIncomplete, setProfileIncomplete] = useState(false)
+  const [doorNo, setDoorNo] = useState("")
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -118,6 +119,7 @@ function SubmitComplaint() {
       submitData.append('latitude', formData.latitude || '')
       submitData.append('longitude', formData.longitude || '')
       submitData.append('firebase_uid', userId)
+      submitData.append('door_no', doorNo)
 
       // Add files
       files.forEach(file => {
@@ -140,6 +142,7 @@ function SubmitComplaint() {
         latitude: formData.latitude,
         longitude: formData.longitude,
         status: 'pending',
+        door_no: doorNo,
       }
 
       await createComplaint(userId, complaintData)
@@ -153,6 +156,7 @@ function SubmitComplaint() {
         longitude: null,
       })
       setFiles([])
+      setDoorNo("")
 
       setTimeout(() => {
         navigate('/my-complaints')
@@ -297,6 +301,40 @@ function SubmitComplaint() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 />
                 <p className="text-xs text-gray-500 mt-2">Be specific and include relevant details for faster resolution</p>
+              </div>
+            </div>
+
+            {/* Door Number Section */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Door Number</h2>
+              <p className="text-sm text-gray-500 mb-6">Specify the door number for accurate complaint handling</p>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Door Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={doorNo}
+                  onChange={e => setDoorNo(e.target.value)}
+                  placeholder="e.g., 123A"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Use Current Location Button */}
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.geolocation.getCurrentPosition(pos => {
+                      setFormData(f => ({ ...f, latitude: pos.coords.latitude, longitude: pos.coords.longitude }));
+                    });
+                  }}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                >
+                  Use Current Location
+                </button>
               </div>
             </div>
 

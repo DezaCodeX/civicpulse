@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser, Complaint, ComplaintDocument
+from .models import CustomUser, Complaint, ComplaintDocument, Volunteer, VerificationImage, CivicContact
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -12,16 +12,37 @@ class ComplaintDocumentSerializer(serializers.ModelSerializer):
         model = ComplaintDocument
         fields = ('id', 'file_name', 'file_size', 'file', 'uploaded_at')
 
+
+class VerificationImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VerificationImage
+        fields = ('id', 'image', 'uploaded_at')
+
 class ComplaintSerializer(serializers.ModelSerializer):
     documents = ComplaintDocumentSerializer(many=True, read_only=True)
+    verification_images = VerificationImageSerializer(many=True, read_only=True, source='verification_images')
     user = CustomUserSerializer(read_only=True)
     
     class Meta:
         model = Complaint
         fields = ('id', 'title', 'description', 'category', 'department', 'latitude', 
-                  'longitude', 'location', 'status', 'support_count', 'is_public', 
-                  'documents', 'user', 'created_at', 'updated_at')
+                  'longitude', 'location', 'ward', 'zone', 'door_no', 'area_name',
+                  'status', 'support_count', 'is_public', 'verified_by_volunteer', 'verification_notes',
+                  'tracking_id', 'status_history', 'is_escalated', 'documents', 'verification_images', 'user', 'created_at', 'updated_at')
         read_only_fields = ('id', 'category', 'department', 'support_count', 'user', 'created_at', 'updated_at')
+
+
+class VolunteerSerializer(serializers.ModelSerializer):
+    user = CustomUserSerializer(read_only=True)
+    class Meta:
+        model = Volunteer
+        fields = ('id', 'user', 'ward', 'zone', 'area', 'is_approved')
+
+
+class CivicContactSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CivicContact
+        fields = ('id', 'department', 'ward', 'office_name', 'contact_type', 'contact_value', 'verified')
 
 class ComplaintCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating complaints (handles file uploads separately)"""

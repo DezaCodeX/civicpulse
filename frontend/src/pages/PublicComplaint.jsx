@@ -11,6 +11,7 @@ function PublicComplaint() {
   const [error, setError] = useState('')
   const [supportCount, setSupportCount] = useState(0)
   const [hasSupported, setHasSupported] = useState(false)
+  const [profileComplete, setProfileComplete] = useState(true)
 
   useEffect(() => {
     const loadComplaint = async () => {
@@ -31,6 +32,11 @@ function PublicComplaint() {
         setLoading(false)
       }
     }
+
+    // Fetch profile completeness
+    api.get("/api/profile/").then(res => {
+      setProfileComplete(res.data.profile_complete !== false);
+    }).catch(() => setProfileComplete(false));
 
     loadComplaint()
   }, [complaintId])
@@ -189,8 +195,8 @@ function PublicComplaint() {
               </p>
               <div className="flex items-center gap-6">
                 <button
+                  disabled={!profileComplete || hasSupported}
                   onClick={handleSupport}
-                  disabled={hasSupported}
                   className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition ${
                     hasSupported
                       ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
@@ -200,6 +206,11 @@ function PublicComplaint() {
                   <ThumbsUp size={20} />
                   {hasSupported ? 'Supported' : 'Support This Complaint'}
                 </button>
+                {!profileComplete && (
+                  <p className="text-red-500 text-sm">
+                    Please complete your profile to support complaints.
+                  </p>
+                )}
                 <div className="text-center">
                   <p className="text-3xl font-bold text-blue-600">{supportCount}</p>
                   <p className="text-sm text-gray-600">people support this</p>

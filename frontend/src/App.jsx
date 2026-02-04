@@ -15,6 +15,8 @@ import AdminDashboard from './pages/AdminDashboard'
 import PublicComplaints from './pages/PublicComplaints'
 import PublicComplaint from './pages/PublicComplaint'
 import PrivateRoute from './components/PrivateRoute'
+import VolunteerDashboard from './pages/VolunteerDashboard'
+import TrackComplaint from './pages/TrackComplaint'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -74,7 +76,9 @@ function App() {
             </PrivateRoute>
           }
         />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/volunteer/dashboard" element={<VolunteerDashboard />} />
+        <Route path="/track" element={<TrackComplaint />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
         
         {/* Public Pages - No Authentication Required */}
         <Route path="/complaints" element={<PublicComplaints />} />
