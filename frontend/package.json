@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
     "axios": "^1.13.2",
     "chart.js": "^4.5.1",
     "firebase": "^12.8.0",
@@ -17,6 +18,8 @@
     "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.8.0",
     "react-scripts": "^0.0.0",
+    "supabase": "^2.76.4",
+    "supabase-js": "^0.0.1-security",
     "tailwindcss": "^3.2.4"
   },
   "scripts": {
