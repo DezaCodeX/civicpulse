@@ -15,6 +15,7 @@ from .views import (
     admin_verification_queue, admin_verify_complaint,
     # Volunteer Management
     admin_volunteers_list, admin_approve_volunteer, admin_create_volunteer,
+    available_users, delete_volunteer,
     # Analytics endpoints
     analytics_dashboard, analytics_geographic,
     # Phase 4
@@ -64,6 +65,8 @@ urlpatterns = [
     path('admin/volunteers/', admin_volunteers_list, name='admin_volunteers_list'),
     path('admin/volunteers/<int:volunteer_id>/approve/', admin_approve_volunteer, name='admin_approve_volunteer'),
     path('admin/volunteers/create/', admin_create_volunteer, name='admin_create_volunteer'),
+    path('admin/available-users/', available_users, name='available_users'),
+    path('admin/volunteers/<int:volunteer_id>/delete/', delete_volunteer, name='delete_volunteer'),
     
     # Analytics Endpoints
     path('admin/analytics/', analytics_dashboard, name='analytics_dashboard'),

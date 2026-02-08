@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Home, Phone, MapPin, Building, Navigation } from 'lucide-react';
-import { getUserProfile, updateUserProfile } from '../services/firestore';
-import { auth } from '../firebase';
+import api from '../services/api';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -14,6 +13,9 @@ const Profile = () => {
     city: '',
     state: '',
     phone_number: '',
+    ward: '',
+    zone: '',
+    area: '',
   });
   const [location, setLocation] = useState({
     latitude: null,
@@ -28,30 +30,28 @@ const Profile = () => {
     const loadProfile = async () => {
       setLoading(true);
       try {
-        const userId = localStorage.getItem('userId');
-        if (!userId) {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) {
           setError('User not authenticated. Please log in.');
           navigate('/login');
           return;
         }
 
-        const userData = await getUserProfile(userId);
-        const currentUser = auth.currentUser;
-        const firebaseEmail = currentUser?.email || localStorage.getItem('userEmail') || '';
-
-        if (userData) {
+        // Fetch user profile from Django API
+        const response = await api.get('/api/profile/');
+        if (response.data) {
           setProfile({
-            first_name: userData.first_name || '',
-            last_name: userData.last_name || '',
-            email: firebaseEmail,
-            address: userData.address || '',
-            city: userData.city || '',
-            state: userData.state || '',
-            phone_number: userData.phone_number || '',
+            first_name: response.data.first_name || '',
+            last_name: response.data.last_name || '',
+            email: response.data.email || localStorage.getItem('userEmail') || '',
+            address: response.data.address || '',
+            city: response.data.city || '',
+            state: response.data.state || '',
+            phone_number: response.data.phone_number || '',
+            ward: response.data.ward || '',
+            zone: response.data.zone || '',
+            area: response.data.area || '',
           });
-        } else {
-          // New user - just set email from Firebase
-          setProfile(prev => ({ ...prev, email: firebaseEmail }));
         }
         setLoading(false);
       } catch (err) {
@@ -77,7 +77,7 @@ const Profile = () => {
         }
       );
     }
-  }, []);
+  }, [navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -94,16 +94,7 @@ const Profile = () => {
     setSuccess('');
 
     try {
-      const userId = localStorage.getItem('userId');
-      if (!userId) {
-        setError('User not authenticated.');
-        setSaving(false);
-        return;
-      }
-
-      console.log('Profile: Updating profile for user:', userId);
-
-      // Prepare profile data
+      // Update profile via Django API
       const profileData = {
         first_name: profile.first_name,
         last_name: profile.last_name,
@@ -111,20 +102,20 @@ const Profile = () => {
         city: profile.city,
         state: profile.state,
         phone_number: profile.phone_number,
-        email: profile.email,
+        ward: profile.ward,
+        zone: profile.zone,
+        area: profile.area,
       };
 
-      console.log('Profile: Profile data to save:', profileData);
-
-      // Update profile in Firestore
-      await updateUserProfile(userId, profileData);
+      console.log('Profile: Updating profile with data:', profileData);
+      
+      await api.patch('/api/profile/', profileData);
       console.log('Profile: Successfully updated');
       setSuccess('Profile updated successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error("Failed to update profile", err);
-      console.error('Error details:', err.code, err.message);
-      setError(`Failed to update profile. Error: ${err.message || 'Please try again.'}`);
+      setError(`Failed to update profile. Error: ${err.response?.data?.error || err.message || 'Please try again.'}`);
     } finally {
       setSaving(false);
     }
@@ -227,6 +218,36 @@ const Profile = () => {
                 <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                     <input type="text" name="state" id="state" value={profile.state || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+              </div>
+            </div>
+
+            {/* Ward, Zone, Area */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Ward */}
+              <div className="form-group">
+                <label htmlFor="ward" className="block text-sm font-medium text-gray-700 mb-1">Ward</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input type="text" name="ward" id="ward" placeholder="e.g., Ward 5" value={profile.ward || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+              </div>
+
+              {/* Zone */}
+              <div className="form-group">
+                <label htmlFor="zone" className="block text-sm font-medium text-gray-700 mb-1">Zone</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input type="text" name="zone" id="zone" placeholder="e.g., North Zone" value={profile.zone || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+              </div>
+
+              {/* Area */}
+              <div className="form-group">
+                <label htmlFor="area" className="block text-sm font-medium text-gray-700 mb-1">Area</label>
+                <div className="relative">
+                  <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <input type="text" name="area" id="area" placeholder="e.g., Downtown" value={profile.area || ''} onChange={handleChange} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
                 </div>
               </div>
             </div>

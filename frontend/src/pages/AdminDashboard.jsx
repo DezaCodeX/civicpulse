@@ -49,6 +49,9 @@ const AdminDashboard = () => {
   });
   const [creatingVolunteer, setCreatingVolunteer] = useState(false);
   const [deletingVolunteer, setDeletingVolunteer] = useState({});
+  const [volunteerError, setVolunteerError] = useState("");
+  const [userSearchInput, setUserSearchInput] = useState("");
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   // Analytics Tab
   const [analytics, setAnalytics] = useState(null);
@@ -192,11 +195,12 @@ const AdminDashboard = () => {
   const handleCreateVolunteer = async (e) => {
     e.preventDefault();
     if (!selectedUserId || !volunteerData.ward || !volunteerData.zone || !volunteerData.area) {
-      alert("Please fill in all fields");
+      setVolunteerError("Please fill in all fields");
       return;
     }
 
     try {
+      setVolunteerError("");
       setCreatingVolunteer(true);
       await api.post("/api/admin/volunteers/create/", {
         user_id: selectedUserId,
@@ -205,14 +209,14 @@ const AdminDashboard = () => {
         area: volunteerData.area,
       });
 
-      alert("Volunteer created successfully!");
       setShowCreateVolunteerModal(false);
       setSelectedUserId("");
       setVolunteerData({ ward: "", zone: "", area: "" });
+      setVolunteerError("");
       await fetchVolunteers();
     } catch (err) {
       console.error("Create volunteer error:", err);
-      alert(err.response?.data?.error || "Failed to create volunteer");
+      setVolunteerError(err.response?.data?.error || "Failed to create volunteer");
     } finally {
       setCreatingVolunteer(false);
     }
@@ -651,6 +655,180 @@ const AdminDashboard = () => {
                     ))
                   )}
                 </div>
+
+                {/* CREATE VOLUNTEER MODAL */}
+                {showCreateVolunteerModal && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-90vh overflow-y-auto">
+                      <div className="flex items-center justify-between p-6 border-b">
+                        <h3 className="text-lg font-semibold">Create New Volunteer</h3>
+                        <button
+                          onClick={() => {
+                            setShowCreateVolunteerModal(false);
+                            setSelectedUserId("");
+                            setVolunteerData({ ward: "", zone: "", area: "" });
+                          }}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleCreateVolunteer} className="p-6 space-y-4">
+                        {/* User Selection - Searchable */}
+                        <div className="relative">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Search User by Email
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Search by email or name..."
+                            value={userSearchInput}
+                            onChange={(e) => {
+                              setUserSearchInput(e.target.value);
+                              setShowUserDropdown(true);
+                            }}
+                            onFocus={() => setShowUserDropdown(true)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                          
+                          {/* Filtered Users Dropdown */}
+                          {showUserDropdown && (
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                              {availableUsers
+                                .filter((user) =>
+                                  `${user.email} ${user.first_name} ${user.last_name}`
+                                    .toLowerCase()
+                                    .includes(userSearchInput.toLowerCase())
+                                )
+                                .map((user) => (
+                                  <button
+                                    key={user.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedUserId(user.id);
+                                      setUserSearchInput(`${user.first_name} ${user.last_name} (${user.email})`);
+                                      setShowUserDropdown(false);
+                                    }}
+                                    className="w-full text-left px-3 py-2 hover:bg-blue-100 border-b last:border-b-0 transition"
+                                  >
+                                    <div className="font-medium text-gray-900">
+                                      {user.first_name} {user.last_name}
+                                    </div>
+                                    <div className="text-sm text-gray-600">{user.email}</div>
+                                  </button>
+                                ))}
+                              {availableUsers.filter((user) =>
+                                `${user.email} ${user.first_name} ${user.last_name}`
+                                  .toLowerCase()
+                                  .includes(userSearchInput.toLowerCase())
+                              ).length === 0 && (
+                                <div className="px-3 py-2 text-gray-500 text-sm">No users found</div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Selected User Display */}
+                          {selectedUserId && (
+                            <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-900">
+                              ✓ User selected: {userSearchInput}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Ward Input */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Ward <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={volunteerData.ward}
+                            onChange={(e) =>
+                              setVolunteerData({ ...volunteerData, ward: e.target.value })
+                            }
+                            placeholder="e.g., Ward 5"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            required
+                          />
+                        </div>
+
+                        {/* Zone Input */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Zone <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={volunteerData.zone}
+                            onChange={(e) =>
+                              setVolunteerData({ ...volunteerData, zone: e.target.value })
+                            }
+                            placeholder="e.g., North Zone"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            required
+                          />
+                        </div>
+
+                        {/* Area Input */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Area <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={volunteerData.area}
+                            onChange={(e) =>
+                              setVolunteerData({ ...volunteerData, area: e.target.value })
+                            }
+                            placeholder="e.g., Downtown"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            required
+                          />
+                        </div>
+
+                        {/* Error Message */}
+                        {volunteerError && (
+                          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded">
+                            {volunteerError}
+                          </div>
+                        )}
+
+                        {/* Form Buttons */}
+                        <div className="flex gap-3 pt-4 border-t">
+                          <button
+                            type="submit"
+                            disabled={creatingVolunteer || !selectedUserId}
+                            className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                            {creatingVolunteer ? (
+                              <>
+                                <Loader size={16} className="animate-spin" />
+                                Creating...
+                              </>
+                            ) : (
+                              <>
+                                <Plus size={16} />
+                                Create Volunteer
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCreateVolunteerModal(false);
+                              setSelectedUserId("");
+                              setVolunteerData({ ward: "", zone: "", area: "" });
+                            }}
+                            className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

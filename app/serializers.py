@@ -5,7 +5,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ('id', 'email', 'first_name', 'last_name', 'address', 'city', 'state', 'phone_number', 'is_staff', 'is_superuser')
+        fields = ('id', 'email', 'first_name', 'last_name', 'address', 'city', 'state', 'phone_number', 'ward', 'zone', 'area', 'is_staff', 'is_superuser')
 
 class ComplaintDocumentSerializer(serializers.ModelSerializer):
     class Meta:

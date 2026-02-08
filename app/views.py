@@ -31,7 +31,7 @@ def user_profile(request):
     if request.method == 'GET':
         serializer = CustomUserSerializer(request.user)
         return Response(serializer.data)
-    elif request.method == 'PUT':
+    elif request.method in ['PUT', 'PATCH']:
         serializer = CustomUserSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -829,24 +829,36 @@ def admin_approve_volunteer(request, volunteer_id):
 @permission_classes([IsAuthenticated])
 def admin_create_volunteer(request):
     """
-    Admin creates a new volunteer.
-    Body: {"email": "...", "ward": "...", "zone": "...", "area": "..."}
+    Admin creates a new volunteer from existing user.
+    Body: {"user_id": <id>, "ward": "...", "zone": "...", "area": "..."}
+    OR (legacy): {"email": "...", "ward": "...", "zone": "...", "area": "..."}
     """
     if not is_admin(request.user):
         return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
     
+    # Accept either user_id or email
+    user_id = request.data.get('user_id')
     email = request.data.get('email')
     ward = request.data.get('ward')
     zone = request.data.get('zone')
     area = request.data.get('area')
     
-    if not all([email, ward, zone, area]):
-        return Response({'error': 'email, ward, zone, area are required'}, status=status.HTTP_400_BAD_REQUEST)
+    if not all([ward, zone, area]):
+        return Response({'error': 'ward, zone, area are required'}, status=status.HTTP_400_BAD_REQUEST)
     
-    try:
-        user = CustomUser.objects.get(email=email)
-    except CustomUser.DoesNotExist:
-        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    # Get user by ID or email
+    if user_id:
+        try:
+            user = CustomUser.objects.get(id=user_id)
+        except CustomUser.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    elif email:
+        try:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    else:
+        return Response({'error': 'user_id or email is required'}, status=status.HTTP_400_BAD_REQUEST)
     
     # Check if volunteer profile already exists
     vol, created = Volunteer.objects.get_or_create(
@@ -1190,6 +1202,57 @@ def analytics_geographic(request):
     ).values('latitude', 'longitude', 'location', 'id', 'title', 'department')
     
     return Response(list(complaints))
+
+
+# ==================== VOLUNTEER MANAGEMENT ENDPOINTS ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def available_users(request):
+    """
+    Get list of users who are not yet volunteers.
+    Only accessible to authenticated users (preferably admins).
+    """
+    try:
+        # Get all users except those who already have a volunteer profile
+        users = CustomUser.objects.filter(
+            volunteer_profile__isnull=True
+        ).values('id', 'email', 'first_name', 'last_name')
+        
+        return Response(list(users), status=status.HTTP_200_OK)
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching available users: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Failed to fetch available users'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_volunteer(request, volunteer_id):
+    """
+    Delete a volunteer (soft delete - marks as deleted).
+    """
+    try:
+        volunteer = Volunteer.objects.get(id=volunteer_id)
+        volunteer.delete()
+        return Response(
+            {'success': True, 'message': 'Volunteer deleted successfully'},
+            status=status.HTTP_200_OK
+        )
+    except Volunteer.DoesNotExist:
+        return Response(
+            {'error': 'Volunteer not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error deleting volunteer: {str(e)}", exc_info=True)
+        return Response(
+            {'error': f'Failed to delete volunteer: {str(e)}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 # ==================== HELPER FUNCTIONS ====================
