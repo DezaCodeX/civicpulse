@@ -153,3 +153,84 @@ def export_complaint_pdf_simple(complaint):
         text += f"Status: {complaint.status}\n"
         text += f"Description:\n{complaint.description}\n"
         return text.encode('utf-8')
+
+
+def validate_verification_image(file_obj, complaint):
+    """
+    Comprehensive validation for volunteer verification images.
+    
+    Checks:
+    1. File exists and is not None
+    2. File type is image (JPEG, PNG, GIF, WebP)
+    3. Hash comparison for duplicates
+    4. Blur detection (returns warning if blurry)
+    5. File size check (max 10MB)
+    
+    Returns: {
+        'is_valid': bool,
+        'errors': [list of error messages],
+        'warnings': [list of warning messages],
+        'should_flag_for_review': bool
+    }
+    """
+    result = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': [],
+        'should_flag_for_review': False
+    }
+    
+    # Check 1: File exists
+    if not file_obj:
+        result['is_valid'] = False
+        result['errors'].append('No file provided')
+        return result
+    
+    # Check 2: File type
+    ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/jpg']
+    content_type = getattr(file_obj, 'content_type', '')
+    
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        result['is_valid'] = False
+        result['errors'].append(f'Invalid file type. Allowed: JPEG, PNG, GIF, WebP. Got: {content_type}')
+    
+    # Check 3: File size (max 10MB)
+    max_size = 10 * 1024 * 1024  # 10MB
+    file_size = getattr(file_obj, 'size', 0)
+    
+    if file_size > max_size:
+        result['is_valid'] = False
+        result['errors'].append(f'File size too large. Max: 10MB, Got: {file_size / (1024*1024):.2f}MB')
+    
+    # Check 4: Hash comparison for duplicates
+    if complaint and result['is_valid']:
+        try:
+            img_hash = get_image_hash(file_obj)
+            existing_hashes = set()
+            
+            for vi in complaint.verification_images.all():
+                try:
+                    existing_img_hash = get_image_hash(vi.image)
+                    existing_hashes.add(existing_img_hash)
+                except Exception:
+                    pass
+            
+            if img_hash and img_hash in existing_hashes:
+                result['is_valid'] = False
+                result['errors'].append('This image has already been uploaded for this complaint')
+                result['should_flag_for_review'] = True
+        except Exception as e:
+            result['warnings'].append(f'Could not verify duplicates: {str(e)}')
+    
+    # Check 5: Blur detection
+    if result['is_valid']:
+        try:
+            is_blurry = check_image_blur(file_obj)
+            if is_blurry:
+                result['warnings'].append('Image appears to be blurry. Please upload a clearer photo for better verification.')
+                result['should_flag_for_review'] = True
+        except Exception as e:
+            result['warnings'].append(f'Could not check image quality: {str(e)}')
+    
+    return result
+

@@ -96,6 +96,85 @@ def firebase_login(request):
         logger.error(f"Firebase login error: {str(e)}", exc_info=True)
         return Response({'error': str(e)}, status=400)
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def supabase_login(request):
+    """
+    Supabase login endpoint.
+    Syncs Supabase OAuth authentication with Django user system.
+    
+    Expected request data:
+    {
+        "email": "user@example.com",
+        "supabase_token": "...",  # Supabase access token
+        "user_metadata": {...}     # Optional metadata from Supabase
+    }
+    
+    Returns JWT tokens and user data for Django authentication.
+    """
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        email = request.data.get('email')
+        supabase_token = request.data.get('supabase_token')
+        user_metadata = request.data.get('user_metadata', {})
+        
+        logger.info(f"Supabase login attempt: email={email}")
+        
+        if not email or not supabase_token:
+            return Response(
+                {'error': 'email and supabase_token are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Try to get existing user by email
+        user = CustomUser.objects.filter(email=email).first()
+        logger.info(f"User lookup by email: {user}")
+        
+        if not user:
+            # Create new user from Supabase
+            # Extract name from metadata if available
+            first_name = user_metadata.get('first_name', '')
+            last_name = user_metadata.get('last_name', '')
+            
+            # If no name in metadata, try to parse from user_metadata.name
+            if not first_name and not last_name:
+                full_name = user_metadata.get('name', '')
+                if full_name:
+                    name_parts = full_name.split(' ', 1)
+                    first_name = name_parts[0]
+                    last_name = name_parts[1] if len(name_parts) > 1 else ''
+            
+            user = CustomUser.objects.create_user(
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+                username=email.split('@')[0],  # Use part of email as username
+            )
+            logger.info(f"Created new user from Supabase: {email}")
+        
+        # Generate JWT tokens
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(user)
+        
+        response_data = {
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            'user': CustomUserSerializer(user).data
+        }
+        logger.info(f"Returning tokens for user: {email}")
+        return Response(response_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Supabase login error: {str(e)}", exc_info=True)
+        return Response(
+            {'error': f'Authentication failed: {str(e)}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def test_view(request):
@@ -348,29 +427,33 @@ def upload_verification_image(request, complaint_id):
 
     img = request.FILES['image']
     
-    # Phase 4: Check for duplicate image via hash
-    from app.utils import get_image_hash, check_image_blur
-    img_hash = get_image_hash(img)
+    # Comprehensive file validation
+    from app.utils import validate_verification_image
+    validation = validate_verification_image(img, complaint)
     
-    # Check if this image already exists for this complaint
-    existing_hashes = set()
-    for vi in complaint.verification_images.all():
-        try:
-            existing_img_hash = get_image_hash(vi.image)
-            existing_hashes.add(existing_img_hash)
-        except Exception:
-            pass
+    if not validation['is_valid']:
+        return Response({
+            'error': 'Image validation failed',
+            'errors': validation['errors'],
+            'warnings': validation['warnings']
+        }, status=status.HTTP_400_BAD_REQUEST)
     
-    if img_hash and img_hash in existing_hashes:
-        return Response({'error': 'Duplicate image detected'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Check for blur
-    is_blurry = check_image_blur(img)
-    if is_blurry:
-        return Response({'error': 'Image is too blurry; please upload a clearer photo'}, status=status.HTTP_400_BAD_REQUEST)
-    
+    # Create verification image
     vi = VerificationImage.objects.create(complaint=complaint, image=img)
-    return Response({'message': 'Image uploaded', 'id': vi.id}, status=status.HTTP_201_CREATED)
+    
+    # Flag for admin review if validation warnings exist
+    if validation['should_flag_for_review']:
+        complaint.flag_for_admin_review = True
+        complaint.admin_review_reason = 'Image validation warning: ' + ', '.join(validation['warnings'])
+        complaint.save()
+    
+    response_data = {
+        'message': 'Image uploaded successfully',
+        'id': str(vi.id),
+        'warnings': validation['warnings'] if validation['warnings'] else []
+    }
+    
+    return Response(response_data, status=status.HTTP_201_CREATED)
 
 
 
@@ -399,18 +482,22 @@ def verify_complaint(request, complaint_id):
 
     if action == 'approve':
         complaint.verified_by_volunteer = True
+        complaint.verified_by_volunteer_user = request.user
+        complaint.volunteer_verification_timestamp = now()
         complaint.verification_notes = notes
         entry = {'ts': now().isoformat(), 'actor': request.user.email, 'action': 'approved', 'notes': notes}
         complaint.status_history = complaint.status_history + [entry]
         complaint.save()
-        return Response({'message': 'Complaint approved'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Complaint approved by volunteer'}, status=status.HTTP_200_OK)
     elif action == 'reject':
         complaint.verified_by_volunteer = False
+        complaint.verified_by_volunteer_user = None
+        complaint.volunteer_verification_timestamp = None
         complaint.verification_notes = notes
         entry = {'ts': now().isoformat(), 'actor': request.user.email, 'action': 'rejected', 'notes': notes}
         complaint.status_history = complaint.status_history + [entry]
         complaint.save()
-        return Response({'message': 'Complaint rejected'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Complaint rejected by volunteer'}, status=status.HTTP_200_OK)
     else:
         return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -489,6 +576,293 @@ def escalate_complaint(request, complaint_id):
     complaint.status_history = complaint.status_history + [entry]
     complaint.save()
     return Response({'message': 'Complaint escalated'}, status=status.HTTP_200_OK)
+
+
+# ==================== VOLUNTEER DASHBOARD & FILTERING ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def volunteer_dashboard_filters(request):
+    """
+    Get filtered complaints for volunteer dashboard.
+    Query params: ward, zone, area, status, category
+    /api/volunteer/dashboard/?ward=X&zone=Y&status=pending
+    """
+    try:
+        vol = Volunteer.objects.get(user=request.user)
+    except Volunteer.DoesNotExist:
+        return Response({'error': 'Volunteer profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    if not vol.is_approved:
+        return Response({'error': 'Volunteer not approved'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Base query: complaints in volunteer's assigned location
+    complaints = Complaint.objects.filter(
+        Q(ward=vol.ward) | Q(zone=vol.zone) | Q(area_name=vol.area)
+    )
+    
+    # Apply optional filters
+    ward = request.query_params.get('ward')
+    zone = request.query_params.get('zone')
+    area = request.query_params.get('area')
+    status_filter = request.query_params.get('status')
+    category = request.query_params.get('category')
+    
+    if ward:
+        complaints = complaints.filter(ward=ward)
+    if zone:
+        complaints = complaints.filter(zone=zone)
+    if area:
+        complaints = complaints.filter(area_name=area)
+    if status_filter:
+        complaints = complaints.filter(status=status_filter)
+    if category:
+        complaints = complaints.filter(category=category)
+    
+    # Exclude already verified complaints
+    complaints = complaints.filter(verified_by_volunteer=False)
+    
+    serializer = ComplaintSerializer(complaints.order_by('-created_at'), many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def volunteer_check_approval(request):
+    """
+    Check if user is an approved volunteer.
+    Returns volunteer profile if approved, else error.
+    """
+    try:
+        vol = Volunteer.objects.get(user=request.user)
+        if not vol.is_approved:
+            return Response({'error': 'Volunteer not approved'}, status=status.HTTP_403_FORBIDDEN)
+        
+        from app.serializers import VolunteerSerializer
+        serializer = VolunteerSerializer(vol)
+        return Response({
+            'is_approved': True,
+            'volunteer': serializer.data
+        })
+    except Volunteer.DoesNotExist:
+        return Response({'error': 'Volunteer profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# ==================== ADMIN VERIFICATION OF VOLUNTEER PROOF ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_verification_queue(request):
+    """
+    Admin endpoint: Get complaints awaiting admin verification.
+    Only shows complaints that were approved by volunteer but not yet verified by admin.
+    /api/admin/verification-queue/
+    """
+    if not is_admin(request.user):
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Get complaints that are volunteer-verified but not admin-verified
+    complaints = Complaint.objects.filter(
+        verified_by_volunteer=True,
+        admin_verified=False
+    ).select_related('user', 'verified_by_volunteer_user').order_by('-volunteer_verification_timestamp')
+    
+    data = []
+    for c in complaints:
+        data.append({
+            'id': str(c.id),
+            'title': c.title,
+            'description': c.description,
+            'citizen': {
+                'email': c.user.email,
+                'name': f"{c.user.first_name} {c.user.last_name}".strip(),
+                'phone': c.user.phone_number
+            },
+            'volunteer': {
+                'email': c.verified_by_volunteer_user.email if c.verified_by_volunteer_user else 'N/A',
+                'name': f"{c.verified_by_volunteer_user.first_name} {c.verified_by_volunteer_user.last_name}".strip() if c.verified_by_volunteer_user else 'N/A'
+            },
+            'verification_notes': c.verification_notes,
+            'verification_images': [
+                {'id': str(vi.id), 'url': vi.image.url, 'uploaded_at': vi.uploaded_at}
+                for vi in c.verification_images.all()
+            ],
+            'volunteer_verification_timestamp': c.volunteer_verification_timestamp,
+            'ward': c.ward,
+            'zone': c.zone,
+            'area': c.area_name,
+            'category': c.category,
+            'department': c.department,
+            'status': c.status,
+            'flag_for_admin_review': c.flag_for_admin_review,
+            'admin_review_reason': c.admin_review_reason
+        })
+    
+    return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_verify_complaint(request, complaint_id):
+    """
+    Admin verifies or rejects volunteer's verification proof.
+    Body: {"action": "accept"|"reject", "reason": "..."}
+    
+    If accepted: complaint becomes public (is_public=True, admin_verified=True)
+    If rejected: volunteer verification is marked as invalid
+    """
+    if not is_admin(request.user):
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        complaint = Complaint.objects.get(id=complaint_id)
+    except Complaint.DoesNotExist:
+        return Response({'error': 'Complaint not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    if not complaint.verified_by_volunteer:
+        return Response({'error': 'Complaint not verified by volunteer'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    action = request.data.get('action')
+    reason = request.data.get('reason', '')
+    
+    if action == 'accept':
+        complaint.admin_verified = True
+        complaint.admin_verification_timestamp = now()
+        complaint.is_public = True
+        complaint.status = 'verified'
+        entry = {'ts': now().isoformat(), 'actor': request.user.email, 'action': 'admin_verified', 'reason': reason}
+        complaint.status_history = complaint.status_history + [entry]
+        complaint.save()
+        return Response({'message': 'Complaint verified by admin and now public'}, status=status.HTTP_200_OK)
+    
+    elif action == 'reject':
+        complaint.verified_by_volunteer = False
+        complaint.verified_by_volunteer_user = None
+        complaint.volunteer_verification_timestamp = None
+        complaint.admin_verified = False
+        complaint.is_public = False
+        complaint.admin_review_reason = reason
+        entry = {'ts': now().isoformat(), 'actor': request.user.email, 'action': 'admin_rejected', 'reason': reason}
+        complaint.status_history = complaint.status_history + [entry]
+        complaint.save()
+        return Response({'message': 'Volunteer verification rejected by admin'}, status=status.HTTP_200_OK)
+    
+    else:
+        return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ==================== VOLUNTEER MANAGEMENT (ADMIN) ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_volunteers_list(request):
+    """
+    Admin endpoint: List all volunteers with their details.
+    /api/admin/volunteers/
+    """
+    if not is_admin(request.user):
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+    
+    volunteers = Volunteer.objects.select_related('user').all().order_by('user__email')
+    
+    # Filter by approval status
+    approval = request.query_params.get('approval')
+    if approval == 'approved':
+        volunteers = volunteers.filter(is_approved=True)
+    elif approval == 'pending':
+        volunteers = volunteers.filter(is_approved=False)
+    
+    data = []
+    for vol in volunteers:
+        data.append({
+            'id': str(vol.id),
+            'user': {
+                'id': vol.user.id,
+                'email': vol.user.email,
+                'name': f"{vol.user.first_name} {vol.user.last_name}".strip(),
+                'phone': vol.user.phone_number,
+                'address': vol.user.address,
+                'city': vol.user.city
+            },
+            'ward': vol.ward,
+            'zone': vol.zone,
+            'area': vol.area,
+            'is_approved': vol.is_approved,
+            'verifications_count': vol.user.verified_complaints.count()
+        })
+    
+    return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_approve_volunteer(request, volunteer_id):
+    """
+    Admin approves or blocks a volunteer.
+    Body: {"action": "approve"|"block"}
+    """
+    if not is_admin(request.user):
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        vol = Volunteer.objects.get(id=volunteer_id)
+    except Volunteer.DoesNotExist:
+        return Response({'error': 'Volunteer not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    action = request.data.get('action')
+    
+    if action == 'approve':
+        vol.is_approved = True
+        vol.save()
+        return Response({'message': 'Volunteer approved'}, status=status.HTTP_200_OK)
+    elif action == 'block':
+        vol.is_approved = False
+        vol.save()
+        return Response({'message': 'Volunteer blocked'}, status=status.HTTP_200_OK)
+    else:
+        return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_create_volunteer(request):
+    """
+    Admin creates a new volunteer.
+    Body: {"email": "...", "ward": "...", "zone": "...", "area": "..."}
+    """
+    if not is_admin(request.user):
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+    
+    email = request.data.get('email')
+    ward = request.data.get('ward')
+    zone = request.data.get('zone')
+    area = request.data.get('area')
+    
+    if not all([email, ward, zone, area]):
+        return Response({'error': 'email, ward, zone, area are required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = CustomUser.objects.get(email=email)
+    except CustomUser.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if volunteer profile already exists
+    vol, created = Volunteer.objects.get_or_create(
+        user=user,
+        defaults={'ward': ward, 'zone': zone, 'area': area, 'is_approved': False}
+    )
+    
+    if not created:
+        vol.ward = ward
+        vol.zone = zone
+        vol.area = area
+        vol.save()
+    
+    from app.serializers import VolunteerSerializer
+    serializer = VolunteerSerializer(vol)
+    return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -577,14 +951,24 @@ def public_complaint_detail(request, complaint_id):
 def public_complaints_list(request):
     """
     List all public complaints (anonymized for public view).
+    Only shows complaints that meet ALL criteria:
+    - is_public == True
+    - verified_by_volunteer == True
+    - admin_verified == True
     Supports filtering by department, category, status.
     """
-    complaints = Complaint.objects.filter(is_public=True)
+    complaints = Complaint.objects.filter(
+        is_public=True,
+        verified_by_volunteer=True,
+        admin_verified=True
+    )
     
     # Filtering
     department = request.query_params.get('department')
     category = request.query_params.get('category')
     status_filter = request.query_params.get('status')
+    ward = request.query_params.get('ward')
+    zone = request.query_params.get('zone')
     
     if department:
         complaints = complaints.filter(department=department)
@@ -592,6 +976,10 @@ def public_complaints_list(request):
         complaints = complaints.filter(category=category)
     if status_filter:
         complaints = complaints.filter(status=status_filter)
+    if ward:
+        complaints = complaints.filter(ward=ward)
+    if zone:
+        complaints = complaints.filter(zone=zone)
     
     # Ordering
     complaints = complaints.order_by('-created_at')
@@ -599,12 +987,19 @@ def public_complaints_list(request):
     data = [{
         'id': str(c.id),
         'title': c.title,
+        'description': c.description,
         'department': c.department,
         'category': c.category,
         'support_count': c.support_count,
         'status': c.status,
         'created_at': c.created_at,
-        'location': c.location
+        'location': c.location,
+        'ward': c.ward,
+        'zone': c.zone,
+        'area': c.area_name,
+        'verified_by_volunteer': c.verified_by_volunteer,
+        'admin_verified': c.admin_verified,
+        'documents_count': c.documents.count()
     } for c in complaints]
     
     return Response(data)

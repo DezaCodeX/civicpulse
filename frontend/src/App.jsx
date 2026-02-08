@@ -16,6 +16,7 @@ import PublicComplaints from './pages/PublicComplaints'
 import PublicComplaint from './pages/PublicComplaint'
 import PrivateRoute from './components/PrivateRoute'
 import VolunteerDashboard from './pages/VolunteerDashboard'
+import VDashboard from './pages/VDashboard'
 import TrackComplaint from './pages/TrackComplaint'
 import AdminRoute from './components/AdminRoute'
 import DebugAdminCheck from './pages/DebugAdminCheck'
@@ -123,6 +124,7 @@ function App() {
           }
         />
         <Route path="/volunteer/dashboard" element={<VolunteerDashboard />} />
+        <Route path="/vdashboard" element={<VDashboard />} />
         <Route path="/track" element={<TrackComplaint />} />
         <Route
           path="/cadmin"

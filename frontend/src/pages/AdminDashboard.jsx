@@ -12,6 +12,9 @@ import {
   Download,
   XCircle,
   Clock,
+  Plus,
+  Trash2,
+  X,
 } from "lucide-react";
 
 const AdminDashboard = () => {
@@ -36,6 +39,16 @@ const AdminDashboard = () => {
   const [volunteers, setVolunteers] = useState([]);
   const [volunteerFilter, setVolunteerFilter] = useState("all");
   const [approvingVolunteer, setApprovingVolunteer] = useState({});
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [showCreateVolunteerModal, setShowCreateVolunteerModal] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [volunteerData, setVolunteerData] = useState({
+    ward: "",
+    zone: "",
+    area: "",
+  });
+  const [creatingVolunteer, setCreatingVolunteer] = useState(false);
+  const [deletingVolunteer, setDeletingVolunteer] = useState({});
 
   // Analytics Tab
   const [analytics, setAnalytics] = useState(null);
@@ -160,6 +173,70 @@ const AdminDashboard = () => {
       alert("Failed to update volunteer status");
     } finally {
       setApprovingVolunteer((prev) => ({
+        ...prev,
+        [volunteerId]: false,
+      }));
+    }
+  };
+
+  const fetchAvailableUsers = async () => {
+    try {
+      const response = await api.get("/api/admin/available-users/");
+      setAvailableUsers(response.data);
+    } catch (err) {
+      console.error("Error fetching available users:", err);
+      alert("Failed to load users");
+    }
+  };
+
+  const handleCreateVolunteer = async (e) => {
+    e.preventDefault();
+    if (!selectedUserId || !volunteerData.ward || !volunteerData.zone || !volunteerData.area) {
+      alert("Please fill in all fields");
+      return;
+    }
+
+    try {
+      setCreatingVolunteer(true);
+      await api.post("/api/admin/volunteers/create/", {
+        user_id: selectedUserId,
+        ward: volunteerData.ward,
+        zone: volunteerData.zone,
+        area: volunteerData.area,
+      });
+
+      alert("Volunteer created successfully!");
+      setShowCreateVolunteerModal(false);
+      setSelectedUserId("");
+      setVolunteerData({ ward: "", zone: "", area: "" });
+      await fetchVolunteers();
+    } catch (err) {
+      console.error("Create volunteer error:", err);
+      alert(err.response?.data?.error || "Failed to create volunteer");
+    } finally {
+      setCreatingVolunteer(false);
+    }
+  };
+
+  const handleDeleteVolunteer = async (volunteerId) => {
+    if (!window.confirm("Are you sure you want to delete this volunteer? This will mark them as inactive.")) {
+      return;
+    }
+
+    try {
+      setDeletingVolunteer((prev) => ({
+        ...prev,
+        [volunteerId]: true,
+      }));
+
+      await api.delete(`/api/admin/volunteers/${volunteerId}/delete/`);
+      alert("Volunteer deleted successfully");
+      await fetchVolunteers();
+    } catch (err) {
+      console.error("Delete volunteer error:", err);
+      alert(err.response?.data?.error || "Failed to delete volunteer");
+    } finally {
+      setDeletingVolunteer((prev) => ({
         ...prev,
         [volunteerId]: false,
       }));
@@ -449,6 +526,27 @@ const AdminDashboard = () => {
             {/* VOLUNTEER MANAGEMENT TAB */}
             {activeTab === "volunteers" && (
               <div className="space-y-6">
+                {/* Header with Create Button */}
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <h3 className="font-semibold text-gray-900 mb-2">Volunteer Management</h3>
+                      <p className="text-sm text-gray-600">Create volunteers from existing users or manage current ones</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowCreateVolunteerModal(true);
+                        fetchAvailableUsers();
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition whitespace-nowrap"
+                    >
+                      <Plus size={18} />
+                      Create Volunteer
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter */}
                 <div className="bg-white rounded-lg shadow-sm p-6">
                   <h3 className="font-semibold text-gray-900 mb-4">Filter</h3>
                   <div className="flex gap-2">
@@ -535,6 +633,18 @@ const AdminDashboard = () => {
                                 Block
                               </button>
                             )}
+                            <button
+                              onClick={() => handleDeleteVolunteer(volunteer.id)}
+                              disabled={deletingVolunteer[volunteer.id]}
+                              className="px-3 py-2 bg-red-100 text-red-600 hover:bg-red-200 rounded-lg transition text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                            >
+                              {deletingVolunteer[volunteer.id] ? (
+                                <Loader size={16} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={16} />
+                              )}
+                              Delete
+                            </button>
                           </div>
                         </div>
                       </div>

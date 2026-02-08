@@ -97,7 +97,17 @@ class Complaint(models.Model):
 
     # Volunteer verification
     verified_by_volunteer = models.BooleanField(default=False)
+    verified_by_volunteer_user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='verified_complaints')
     verification_notes = models.TextField(blank=True)
+    volunteer_verification_timestamp = models.DateTimeField(null=True, blank=True)
+    
+    # Admin verification of volunteer proof
+    admin_verified = models.BooleanField(default=False)
+    admin_verification_timestamp = models.DateTimeField(null=True, blank=True)
+    
+    # File validation flags
+    flag_for_admin_review = models.BooleanField(default=False)
+    admin_review_reason = models.TextField(blank=True)
 
     # Tracking & history
     tracking_id = models.CharField(max_length=12, unique=True, blank=True, null=True)

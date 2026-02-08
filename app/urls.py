@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    SignupView, user_profile, firebase_login, test_view,
+    SignupView, user_profile, firebase_login, supabase_login, test_view,
     # Complaint endpoints
     complaint_list_create, create_complaint_with_files,
     upload_complaint_documents, delete_complaint_document,
@@ -10,6 +10,11 @@ from .views import (
     admin_complaints_list, admin_update_complaint_status,
     # Volunteer / Tracking
     volunteer_complaints, upload_verification_image, verify_complaint, track_complaint,
+    volunteer_dashboard_filters, volunteer_check_approval,
+    # Admin Verification
+    admin_verification_queue, admin_verify_complaint,
+    # Volunteer Management
+    admin_volunteers_list, admin_approve_volunteer, admin_create_volunteer,
     # Analytics endpoints
     analytics_dashboard, analytics_geographic,
     # Phase 4
@@ -20,6 +25,7 @@ urlpatterns = [
     # Auth
     path('signup/', SignupView.as_view(), name='signup'),
     path('firebase-login/', firebase_login, name='firebase_login'),
+    path('supabase-login/', supabase_login, name='supabase_login'),
     path('test/', test_view, name='test'),
     path('profile/', user_profile, name='user_profile'),
     
@@ -35,6 +41,8 @@ urlpatterns = [
     path('complaints/<str:complaint_id>/support/', support_complaint, name='support_complaint'),
     # Volunteer Endpoints
     path('volunteer/complaints/', volunteer_complaints, name='volunteer_complaints'),
+    path('volunteer/dashboard/', volunteer_dashboard_filters, name='volunteer_dashboard_filters'),
+    path('volunteer/check-approval/', volunteer_check_approval, name='volunteer_check_approval'),
     path('volunteer/complaints/<str:complaint_id>/upload-image/', upload_verification_image, name='upload_verification_image'),
     path('volunteer/complaints/<str:complaint_id>/verify/', verify_complaint, name='verify_complaint'),
     path('volunteer/complaints/<str:complaint_id>/escalate/', escalate_complaint, name='escalate_complaint'),
@@ -49,6 +57,13 @@ urlpatterns = [
     # Admin Endpoints
     path('admin/complaints/', admin_complaints_list, name='admin_complaints_list'),
     path('admin/complaints/<str:complaint_id>/status/', admin_update_complaint_status, name='admin_update_complaint_status'),
+    # Admin Verification Queue
+    path('admin/verification-queue/', admin_verification_queue, name='admin_verification_queue'),
+    path('admin/verification-queue/<str:complaint_id>/verify/', admin_verify_complaint, name='admin_verify_complaint'),
+    # Volunteer Management
+    path('admin/volunteers/', admin_volunteers_list, name='admin_volunteers_list'),
+    path('admin/volunteers/<int:volunteer_id>/approve/', admin_approve_volunteer, name='admin_approve_volunteer'),
+    path('admin/volunteers/create/', admin_create_volunteer, name='admin_create_volunteer'),
     
     # Analytics Endpoints
     path('admin/analytics/', analytics_dashboard, name='analytics_dashboard'),
