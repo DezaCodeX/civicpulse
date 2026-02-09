@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { setupAuthStateListener } from './services/supabaseAuthService'
+import { checkSupabaseSessionAndSync, setupAuthStateListener } from './services/supabaseAuthService'
 import Navbar from './components/Navbar'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
@@ -20,6 +20,7 @@ import VDashboard from './pages/VDashboard'
 import TrackComplaint from './pages/TrackComplaint'
 import AdminRoute from './components/AdminRoute'
 import DebugAdminCheck from './pages/DebugAdminCheck'
+import AuthDebug from './pages/AuthDebug'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -27,48 +28,81 @@ function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check if user is already logged in (from localStorage)
-    const checkExistingSession = async () => {
-      const token = localStorage.getItem('access')
-      const userData = localStorage.getItem('user')
-      
-      if (token && userData) {
-        try {
-          setUser(JSON.parse(userData))
+    let subscription
+    let isMounted = true
+
+    const initializeAuth = async () => {
+      console.log('🔍 Checking existing session...')
+
+      const supabaseResult = await checkSupabaseSessionAndSync()
+
+      if (supabaseResult?.user) {
+        console.log('✅ Supabase session restored:', supabaseResult.user.email)
+        if (isMounted) {
+          setUser(supabaseResult.user)
           setIsLoggedIn(true)
-        } catch (err) {
-          console.error('Error parsing user data:', err)
+        }
+      } else {
+        const token = localStorage.getItem('access') || localStorage.getItem('access_token')
+        const userData = localStorage.getItem('user')
+
+        console.log('📦 Token found:', !!token)
+        console.log('📦 User data found:', !!userData)
+
+        if (token && userData) {
+          try {
+            const parsedUser = JSON.parse(userData)
+            console.log('✅ Setting user from localStorage:', parsedUser.email)
+            if (isMounted) {
+              setUser(parsedUser)
+              setIsLoggedIn(true)
+            }
+          } catch (err) {
+            console.error('Error parsing user data:', err)
+            if (isMounted) {
+              setIsLoggedIn(false)
+            }
+          }
+        } else {
+          console.log('❌ No valid session found in localStorage')
+          if (isMounted) {
+            setIsLoggedIn(false)
+          }
         }
       }
-      
-      // Set up listener for future auth state changes
-      const subscription = setupAuthStateListener((event, data) => {
+
+      subscription = setupAuthStateListener((event, data) => {
         console.log('🔐 Auth state event:', event)
-        
+
         if (event === 'signed_in') {
+          console.log('✅ User signed in via Supabase')
           setUser(data?.user)
           setIsLoggedIn(true)
         } else if (event === 'signed_out') {
+          console.log('❌ User signed out')
           setUser(null)
           setIsLoggedIn(false)
         } else if (event === 'user_updated') {
+          console.log('🔄 User updated')
           setUser(data?.user)
         } else if (event === 'error') {
           console.error('Auth error:', data)
         }
       })
-      
-      setLoading(false)
-      
-      // Cleanup subscription on unmount
-      return () => {
-        if (subscription) {
-          subscription.unsubscribe()
-        }
+
+      if (isMounted) {
+        setLoading(false)
       }
     }
-    
-    checkExistingSession()
+
+    initializeAuth()
+
+    return () => {
+      isMounted = false
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
   }, [])
 
   if (loading) {
@@ -139,8 +173,9 @@ function App() {
         <Route path="/complaints" element={<PublicComplaints />} />
         <Route path="/complaint/:complaintId" element={<PublicComplaint />} />
         
-        {/* Debug Page */}
+        {/* Debug Pages */}
         <Route path="/debug/admin" element={<DebugAdminCheck />} />
+        <Route path="/debug/auth" element={<AuthDebug />} />
       </Routes>
     </Router>
   )

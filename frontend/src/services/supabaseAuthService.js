@@ -71,12 +71,14 @@ export const syncSupabaseWithDjango = async (supabaseSession) => {
  */
 export const signInWithGoogle = async () => {
   try {
+    // Build a redirect URL that matches whatever port the app is running on
+    const origin = typeof window !== 'undefined' ? window.location.origin : (import.meta.env.VITE_SUPABASE_REDIRECT_URL || 'http://localhost:3000');
+    const redirectTo = `${origin}/dashboard`;
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo:
-          import.meta.env.VITE_SUPABASE_REDIRECT_URL ||
-          "http://localhost:3000/dashboard",
+        redirectTo,
       },
     });
 
@@ -177,4 +179,33 @@ export const setupAuthStateListener = (callback) => {
   );
 
   return subscription;
+};
+
+/**
+ * Check for an existing Supabase session and sync it with Django if needed
+ * This handles the OAuth redirect case where localStorage isn't populated yet.
+ */
+export const checkSupabaseSessionAndSync = async () => {
+  const { data: { session }, error } = await supabase.auth.getSession();
+
+  if (error || !session) {
+    if (error) {
+      console.error("Error fetching Supabase session:", error);
+    }
+    return null;
+  }
+
+  const existingAccess = localStorage.getItem("access");
+  const existingUser = localStorage.getItem("user");
+
+  if (existingAccess && existingUser) {
+    try {
+      return { session, user: JSON.parse(existingUser) };
+    } catch (err) {
+      console.warn("Failed to parse existing user, re-syncing:", err);
+    }
+  }
+
+  const syncData = await syncSupabaseWithDjango(session);
+  return { session, user: syncData?.user };
 };
