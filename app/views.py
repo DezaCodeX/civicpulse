@@ -628,8 +628,6 @@ def volunteer_dashboard_filters(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
 def volunteer_check_approval(request):
     """
     Check if user is an approved volunteer.
