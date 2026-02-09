@@ -1,8 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Menu, X, LogOut, User } from 'lucide-react'
-import { auth } from '../firebase'
-import { signOut } from 'firebase/auth'
+import { logOut } from '../services/supabaseAuthService'
 
 function Navbar({ isLoggedIn }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -11,9 +10,7 @@ function Navbar({ isLoggedIn }) {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth)
-      localStorage.removeItem('userId')
-      localStorage.removeItem('access')
+      await logOut()
       navigate('/')
       setIsProfileOpen(false)
     } catch (error) {
@@ -48,6 +45,9 @@ function Navbar({ isLoggedIn }) {
                 <Link to="/dashboard" className="px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
                   Dashboard
                 </Link>
+                <Link to="/volunteer/dashboard" className="px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
+                  Verify
+                </Link>
 
                 {/* Profile Dropdown */}
                 <div className="relative">
@@ -78,6 +78,20 @@ function Navbar({ isLoggedIn }) {
                       >
                         My Complaints
                       </Link>
+                      <Link
+                        to="/volunteer/dashboard"
+                        className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
+                        onClick={() => setIsProfileOpen(false)}
+                      >
+                        Verify Complaints
+                      </Link>
+                      <Link
+                        to="/volunteer/login"
+                        className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
+                        onClick={() => setIsProfileOpen(false)}
+                      >
+                        Volunteer Login
+                      </Link>
                       <button
                         onClick={handleLogout}
                         className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 flex items-center space-x-2"
@@ -97,8 +111,14 @@ function Navbar({ isLoggedIn }) {
                 >
                   Login
                 </Link>
+                <Link
+                  to="/volunteer/login"
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  Volunteer Login
+                </Link>
               </>
-            )}
+            )}            )}
           </div>
 
           <button
@@ -126,6 +146,9 @@ function Navbar({ isLoggedIn }) {
                 <Link to="/dashboard" className="block px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
                   Dashboard
                 </Link>
+                <Link to="/volunteer/dashboard" className="block px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
+                  Verify Complaints
+                </Link>
                 <Link to="/profile" className="block px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
                   Profile
                 </Link>
@@ -140,12 +163,20 @@ function Navbar({ isLoggedIn }) {
                 </button>
               </>
             ) : (
-              <Link
-                to="/login"
-                className="block px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Login
-              </Link>
+              <>
+                <Link
+                  to="/login"
+                  className="block px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/volunteer/login"
+                  className="block px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  Volunteer Login
+                </Link>
+              </>
             )}
           </div>
         )}

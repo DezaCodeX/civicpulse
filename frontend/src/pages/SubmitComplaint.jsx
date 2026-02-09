@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Navigation, FileUp, X } from 'lucide-react'
-import { createComplaint, getUserProfile } from '../services/firestore'
-import { api } from '../services/api'
+import api from '../services/api'
 
 function SubmitComplaint() {
   const navigate = useNavigate()
@@ -12,6 +11,9 @@ function SubmitComplaint() {
     description: '',
     latitude: null,
     longitude: null,
+    ward: '',
+    zone: '',
+    area: '',
   })
   const [files, setFiles] = useState([])
   const [profile, setProfile] = useState(null)
@@ -19,24 +21,33 @@ function SubmitComplaint() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [profileIncomplete, setProfileIncomplete] = useState(false)
+  const [doorNo, setDoorNo] = useState("")
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const userId = localStorage.getItem('userId')
-        if (!userId) {
+        const user = JSON.parse(localStorage.getItem('user'))
+        if (!user) {
           navigate('/login')
           return
         }
 
-        const userData = await getUserProfile(userId)
-        if (userData) {
-          setProfile(userData)
+        // Fetch profile from Django API
+        const response = await api.get('/api/profile/')
+        if (response.data) {
+          setProfile(response.data)
           // Check if profile is complete
-          const isComplete = userData.first_name && userData.last_name && userData.address && userData.city && userData.state && userData.phone_number
+          const isComplete = response.data.first_name && response.data.last_name && response.data.address && response.data.city && response.data.state && response.data.phone_number
           if (!isComplete) {
             setProfileIncomplete(true)
           }
+          // Pre-fill ward, zone, area if available in profile
+          setFormData(prev => ({
+            ...prev,
+            ward: response.data.ward || '',
+            zone: response.data.zone || '',
+            area: response.data.area || '',
+          }))
         } else {
           setProfileIncomplete(true)
         }
@@ -103,8 +114,8 @@ function SubmitComplaint() {
     setSuccess('')
 
     try {
-      const userId = localStorage.getItem('userId')
-      if (!userId) {
+      const user = JSON.parse(localStorage.getItem('user'))
+      if (!user) {
         setError('User not authenticated. Please log in.')
         navigate('/login')
         return
@@ -117,7 +128,10 @@ function SubmitComplaint() {
       submitData.append('description', formData.description)
       submitData.append('latitude', formData.latitude || '')
       submitData.append('longitude', formData.longitude || '')
-      submitData.append('firebase_uid', userId)
+      submitData.append('door_no', doorNo)
+      submitData.append('ward', formData.ward || '')
+      submitData.append('zone', formData.zone || '')
+      submitData.append('area_name', formData.area || '')
 
       // Add files
       files.forEach(file => {
@@ -131,18 +145,6 @@ function SubmitComplaint() {
       
       console.log('SubmitComplaint: Response:', response.data)
       setSuccess('Complaint submitted successfully!')
-      
-      // Also save to Firestore for React state management
-      const complaintData = {
-        title: formData.title,
-        location: formData.location,
-        description: formData.description,
-        latitude: formData.latitude,
-        longitude: formData.longitude,
-        status: 'pending',
-      }
-
-      await createComplaint(userId, complaintData)
 
       // Reset form
       setFormData({
@@ -151,8 +153,12 @@ function SubmitComplaint() {
         description: '',
         latitude: null,
         longitude: null,
+        ward: '',
+        zone: '',
+        area: '',
       })
       setFiles([])
+      setDoorNo("")
 
       setTimeout(() => {
         navigate('/my-complaints')
@@ -283,6 +289,48 @@ function SubmitComplaint() {
                 </div>
               )}
 
+              {/* Ward, Zone, Area */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {/* Ward */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ward</label>
+                  <input
+                    type="text"
+                    name="ward"
+                    value={formData.ward}
+                    onChange={handleChange}
+                    placeholder="e.g., Ward 5"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Zone */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Zone</label>
+                  <input
+                    type="text"
+                    name="zone"
+                    value={formData.zone}
+                    onChange={handleChange}
+                    placeholder="e.g., North Zone"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Area */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Area</label>
+                  <input
+                    type="text"
+                    name="area"
+                    value={formData.area}
+                    onChange={handleChange}
+                    placeholder="e.g., Downtown"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
               {/* Description */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -297,6 +345,40 @@ function SubmitComplaint() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 />
                 <p className="text-xs text-gray-500 mt-2">Be specific and include relevant details for faster resolution</p>
+              </div>
+            </div>
+
+            {/* Door Number Section */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Door Number</h2>
+              <p className="text-sm text-gray-500 mb-6">Specify the door number for accurate complaint handling</p>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Door Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={doorNo}
+                  onChange={e => setDoorNo(e.target.value)}
+                  placeholder="e.g., 123A"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Use Current Location Button */}
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.geolocation.getCurrentPosition(pos => {
+                      setFormData(f => ({ ...f, latitude: pos.coords.latitude, longitude: pos.coords.longitude }));
+                    });
+                  }}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                >
+                  Use Current Location
+                </button>
               </div>
             </div>
 

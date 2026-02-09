@@ -1,187 +1,28 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile } from 'firebase/auth'
+import { signInWithGoogle } from '../services/supabaseAuthService'
 import { Shield, Loader } from 'lucide-react'
-import { auth } from '../firebase'
-import { createUserProfile } from '../services/firestore'
 
 function Signup() {
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    password2: '',
-  })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
-  const googleProvider = new GoogleAuthProvider()
-
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-    setError('')
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    
-    // Basic validation
-    if (!formData.fullName.trim()) {
-      setError('Full name is required')
-      setLoading(false)
-      return
-    }
-    if (!formData.email.includes('@')) {
-      setError('Please enter a valid email')
-      setLoading(false)
-      return
-    }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters')
-      setLoading(false)
-      return
-    }
-    if (formData.password !== formData.password2) {
-      setError('Passwords do not match')
-      setLoading(false)
-      return
-    }
-
-    try {
-      // Create Firebase user
-      const firebaseResult = await createUserWithEmailAndPassword(auth, formData.email, formData.password)
-      const userId = firebaseResult.user.uid
-
-      // Parse name
-      const name_parts = formData.fullName.split(' ')
-      const first_name = name_parts[0]
-      const last_name = name_parts.slice(1).join(' ')
-
-      // Update Firebase user profile with display name
-      await updateProfile(firebaseResult.user, {
-        displayName: formData.fullName
-      })
-
-      // Save user profile to Firestore
-      await createUserProfile(userId, {
-        email: formData.email,
-        first_name: first_name,
-        last_name: last_name,
-        address: '',
-        city: '',
-        state: '',
-        phone_number: '',
-      })
-
-      // Store user ID in localStorage for future use
-      localStorage.setItem("userId", userId)
-      localStorage.setItem("userEmail", formData.email)
-
-      // Sync with backend
-      try {
-        const response = await fetch('http://127.0.0.1:8000/api/firebase-login/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            uid: userId,
-            email: formData.email,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          // Store JWT tokens
-          localStorage.setItem('access', data.access);
-          localStorage.setItem('refresh', data.refresh);
-        }
-      } catch (apiErr) {
-        console.error('Backend sync error:', apiErr);
-      }
-
-      console.log('Signup successful!')
-      navigate('/dashboard')
-    } catch (err) {
-      console.error('Signup error:', err)
-      let errorMsg = 'Failed to create account. Please try again.'
-      
-      if (err.code === 'auth/email-already-in-use') {
-        errorMsg = 'Email already in use. Please sign in instead.'
-      } else if (err.code === 'auth/weak-password') {
-        errorMsg = 'Password is too weak. Please use a stronger password.'
-      } else if (err.message) {
-        errorMsg = err.message
-      }
-      
-      setError(errorMsg)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleGoogleSignup = async () => {
     setLoading(true)
     setError('')
 
     try {
-      const firebaseResult = await signInWithPopup(auth, googleProvider)
-      const userId = firebaseResult.user.uid
+      // Initiate Supabase Google OAuth
+      await signInWithGoogle()
 
-      // Get display name from Google
-      const displayName = firebaseResult.user.displayName || ''
-      const name_parts = displayName.split(' ')
-      const first_name = name_parts[0] || ''
-      const last_name = name_parts.slice(1).join(' ') || ''
-
-      // Save or create user profile in Firestore
-      await createUserProfile(userId, {
-        email: firebaseResult.user.email,
-        first_name: first_name,
-        last_name: last_name,
-        address: '',
-        city: '',
-        state: '',
-        phone_number: '',
-      })
-
-      // Store user ID in localStorage
-      localStorage.setItem("userId", userId)
-      localStorage.setItem("userEmail", firebaseResult.user.email)
-
-      // Sync with backend
-      try {
-        const response = await fetch('http://127.0.0.1:8000/api/firebase-login/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            uid: userId,
-            email: firebaseResult.user.email,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          // Store JWT tokens
-          localStorage.setItem('access', data.access);
-          localStorage.setItem('refresh', data.refresh);
-        }
-      } catch (apiErr) {
-        console.error('Backend sync error:', apiErr);
-      }
-
-      navigate('/dashboard')
+      // Supabase will redirect to callback URL (dashboard)
+      // The auth state listener in App.jsx will handle the sync
+      
+      console.log('✅ Google signup initiated, waiting for redirect...')
     } catch (err) {
-      console.error('Google signup error:', err)
+      console.error('❌ Google signup error:', err)
       setError(err.message || 'Failed to sign up with Google.')
-    } finally {
       setLoading(false)
     }
   }
@@ -207,126 +48,26 @@ function Signup() {
           </div>
         )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Full Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Full Name
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleChange}
-                placeholder="John Doe"
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="you@example.com"
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Confirm Password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Confirm Password
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              <input
-                type="password"
-                name="password2"
-                value={formData.password2}
-                onChange={handleChange}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-
-          {/* Create Account Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gray-900 hover:bg-gray-800 disabled:bg-gray-500 text-white font-semibold py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-          >
-            {loading && <Loader size={18} className="animate-spin" />}
-            {loading ? 'Creating Account...' : 'Create Account'}
-          </button>
-        </form>
-
-        {/* Divider */}
-        <div className="my-6 flex items-center">
-          <div className="flex-1 border-t border-gray-300"></div>
-          <span className="px-3 text-sm text-gray-500">Or continue with</span>
-          <div className="flex-1 border-t border-gray-300"></div>
-        </div>
-
         {/* Google Signup */}
         <button
           type="button"
           onClick={handleGoogleSignup}
           disabled={loading}
-          className="w-full border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 font-medium py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+          className="w-full border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 font-medium py-2.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
         >
-          <svg className="w-5 h-5" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032 c0-3.331,2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.461,2.268,15.199,1.393,12.545,1.393 c-6.256,0-11.331,5.075-11.331,11.322c0,6.247,5.075,11.322,11.331,11.322c10.684,0,11.965-9.869,11.304-14.61H12.545Z" />
-          </svg>
-          Sign up with Google
+          {loading ? (
+            <>
+              <Loader size={18} className="animate-spin" />
+              <span>Signing up...</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032 c0-3.331,2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.461,2.268,15.199,1.393,12.545,1.393 c-6.256,0-11.331,5.075-11.331,11.322c0,6.247,5.075,11.322,11.331,11.322c10.684,0,11.965-9.869,11.304-14.61H12.545Z" />
+              </svg>
+              <span>Sign up with Google</span>
+            </>
+          )}
         </button>
 
         {/* Login Link */}
@@ -336,6 +77,11 @@ function Signup() {
             Sign in here
           </Link>
         </p>
+
+        <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-xs">
+          <p className="font-semibold mb-1">✅ Powered by Supabase</p>
+          <p>Secure authentication with Google Sign-In</p>
+        </div>
       </div>
     </div>
   )
