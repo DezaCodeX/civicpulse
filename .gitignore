@@ -11,6 +11,8 @@ __pycache__/
 .env.local
 .env.*.local
 
+node_modules/
+
 # Firebase service account
 firebase-service-account.json
 

@@ -21,6 +21,10 @@ from .views import (
     # Phase 4
     get_civic_contacts, escalate_complaint, export_complaint_csv, export_complaint_pdf
 )
+from .views_admin_analytics import (
+    category_analytics, status_analytics, daily_trend,
+    weekly_trend, monthly_trend, location_data
+)
 
 urlpatterns = [
     # Auth
@@ -71,4 +75,10 @@ urlpatterns = [
     # Analytics Endpoints
     path('admin/analytics/', analytics_dashboard, name='analytics_dashboard'),
     path('admin/analytics/geographic/', analytics_geographic, name='analytics_geographic'),
+    path('admin/analytics/category/', category_analytics, name='category_analytics'),
+    path('admin/analytics/status/', status_analytics, name='status_analytics'),
+    path('admin/analytics/daily/', daily_trend, name='daily_trend'),
+    path('admin/analytics/weekly/', weekly_trend, name='weekly_trend'),
+    path('admin/analytics/monthly/', monthly_trend, name='monthly_trend'),
+    path('admin/analytics/location/', location_data, name='location_data'),
 ]
