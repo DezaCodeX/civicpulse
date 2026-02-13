@@ -118,7 +118,7 @@ function Navbar({ isLoggedIn }) {
                   Volunteer Login
                 </Link>
               </>
-            )}            )}
+            )}
           </div>
 
           <button

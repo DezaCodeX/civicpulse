@@ -16,6 +16,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import AdminAnalytics from "./admin/AdminAnalytics";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -723,6 +724,7 @@ const AdminDashboard = () => {
                     )}
                   </>
                 )}
+                <AdminAnalytics />
               </div>
             )}
 
