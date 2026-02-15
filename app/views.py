@@ -12,6 +12,7 @@ import json
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.timezone import now
+from app.utils import get_sentiment, predict_priority
 
 # Import AI prediction module
 from app.ai.predict import predict_department
@@ -196,11 +197,16 @@ def complaint_list_create(request):
         
         # 🤖 AI-based department prediction
         predicted_dept, confidence = predict_department(description, return_confidence=True)
+
+        sentiment = get_sentiment(description)
+        priority = predict_priority(description)
         
         # Create complaint with AI-predicted department and category
         data = request.data.copy()
         data['department'] = predicted_dept
         data['category'] = predicted_dept  # Category auto-filled by AI
+        data['sentiment'] = sentiment
+        data['priority'] = priority
         
         serializer = ComplaintSerializer(data=data)
         if serializer.is_valid():
@@ -326,6 +332,9 @@ def create_complaint_with_files(request):
         
         # 🤖 AI-based department prediction with confidence score
         department, confidence = predict_department(description, return_confidence=True)
+
+        sentiment = get_sentiment(description)
+        priority = predict_priority(description)
         
         # Create complaint (category auto-filled by AI)
         complaint = Complaint.objects.create(
@@ -334,6 +343,8 @@ def create_complaint_with_files(request):
             description=description,
             category=department,  # Category auto-filled by AI = department
             department=department,
+            sentiment=sentiment,
+            priority=priority,
             latitude=latitude,
             longitude=longitude,
             location=location or f"({latitude}, {longitude})",

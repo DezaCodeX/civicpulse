@@ -23,7 +23,7 @@ from .views import (
 )
 from .views_admin_analytics import (
     category_analytics, status_analytics, daily_trend,
-    weekly_trend, monthly_trend, location_data
+    weekly_trend, monthly_trend, location_data, export_complaints_excel
 )
 
 urlpatterns = [
@@ -81,4 +81,5 @@ urlpatterns = [
     path('admin/analytics/weekly/', weekly_trend, name='weekly_trend'),
     path('admin/analytics/monthly/', monthly_trend, name='monthly_trend'),
     path('admin/analytics/location/', location_data, name='location_data'),
+    path('admin/analytics/export/excel/', export_complaints_excel, name='export_complaints_excel'),
 ]

@@ -13,9 +13,12 @@ import {
   Legend,
 } from "chart.js";
 import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import MarkerClusterGroup from "react-leaflet-markercluster";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 
 import api from "../../services/api";
 
@@ -52,6 +55,7 @@ const emptyState = {
   status: [],
   trend: [],
   locations: [],
+  summary: null,
 };
 
 const formatTrendLabel = (value, period) => {
@@ -77,6 +81,11 @@ const AdminAnalytics = () => {
   const [loading, setLoading] = useState(false);
   const [trendLoading, setTrendLoading] = useState(false);
   const [error, setError] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [exportStartDate, setExportStartDate] = useState("");
+  const [exportEndDate, setExportEndDate] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
 
   useEffect(() => {
     const fetchStaticAnalytics = async () => {
@@ -84,7 +93,8 @@ const AdminAnalytics = () => {
         setLoading(true);
         setError("");
 
-        const [categoryRes, statusRes, locationRes] = await Promise.all([
+        const [summaryRes, categoryRes, statusRes, locationRes] = await Promise.all([
+          api.get("/api/admin/analytics/"),
           api.get("/api/admin/analytics/category/"),
           api.get("/api/admin/analytics/status/"),
           api.get("/api/admin/analytics/location/"),
@@ -92,6 +102,7 @@ const AdminAnalytics = () => {
 
         setData((prev) => ({
           ...prev,
+          summary: summaryRes.data || null,
           category: categoryRes.data || [],
           status: statusRes.data || [],
           locations: (locationRes.data || []).filter(
@@ -185,12 +196,64 @@ const AdminAnalytics = () => {
     };
   }, [data.trend, trendPeriod]);
 
+  const departmentOptions = useMemo(() => {
+    const fromLocations = data.locations.map((item) => item.department || item.category || "");
+    const fromCategories = data.category.map((item) => item.category || "");
+    return Array.from(new Set([...fromLocations, ...fromCategories].filter(Boolean)));
+  }, [data.locations, data.category]);
+
+  const filteredLocations = useMemo(() => {
+    if (departmentFilter === "all") {
+      return data.locations;
+    }
+    return data.locations.filter(
+      (loc) => (loc.department || loc.category) === departmentFilter
+    );
+  }, [data.locations, departmentFilter]);
+
   const mapCenter = useMemo(() => {
-    if (data.locations.length > 0) {
-      return [data.locations[0].latitude, data.locations[0].longitude];
+    if (filteredLocations.length > 0) {
+      return [filteredLocations[0].latitude, filteredLocations[0].longitude];
     }
     return [11.0168, 76.9558];
-  }, [data.locations]);
+  }, [filteredLocations]);
+
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      setExportError("");
+
+      const params = {};
+      if (departmentFilter !== "all") {
+        params.department = departmentFilter;
+      }
+      if (exportStartDate) {
+        params.start_date = exportStartDate;
+      }
+      if (exportEndDate) {
+        params.end_date = exportEndDate;
+      }
+
+      const response = await api.get("/api/admin/analytics/export/excel/", {
+        responseType: "blob",
+        params,
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "complaints.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export error:", err);
+      setExportError("Failed to export Excel report");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -207,6 +270,65 @@ const AdminAnalytics = () => {
           {error}
         </div>
       )}
+
+      {data.summary && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <SummaryCard label="Total Complaints" value={data.summary.total_complaints} />
+          <SummaryCard label="Pending" value={data.summary.pending_complaints} />
+          <SummaryCard label="Resolved" value={data.summary.resolved_complaints} />
+          <SummaryCard label="Last 7 Days" value={data.summary.complaints_last_7_days} />
+        </div>
+      )}
+
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Department Filter</label>
+              <select
+                value={departmentFilter}
+                onChange={(event) => setDepartmentFilter(event.target.value)}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
+              >
+                <option value="all">All departments</option>
+                {departmentOptions.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+              <input
+                type="date"
+                value={exportStartDate}
+                onChange={(event) => setExportStartDate(event.target.value)}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+              <input
+                type="date"
+                value={exportEndDate}
+                onChange={(event) => setExportEndDate(event.target.value)}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col items-start gap-2">
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md shadow-sm disabled:opacity-60"
+            >
+              {exporting ? "Exporting..." : "Export Excel"}
+            </button>
+            {exportError && <p className="text-sm text-red-600">{exportError}</p>}
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow-sm p-6">
@@ -258,36 +380,48 @@ const AdminAnalytics = () => {
 
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Complaint Map</h3>
-        {data.locations.length === 0 ? (
+        {filteredLocations.length === 0 ? (
           <p className="text-gray-600 text-sm">No location data available.</p>
         ) : (
           <MapContainer center={mapCenter} zoom={12} className="h-96 w-full rounded-lg">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            {data.locations.map((loc) => (
-              <Marker position={[loc.latitude, loc.longitude]} key={loc.id}>
-                <Popup>
-                  <div className="text-sm">
-                    <div className="font-semibold">Category: {loc.category}</div>
-                    <div>Status: {loc.status}</div>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
+            <MarkerClusterGroup chunkedLoading>
+              {filteredLocations.map((loc) => (
+                <Marker position={[loc.latitude, loc.longitude]} key={loc.id}>
+                  <Popup>
+                    <div className="text-sm">
+                      <div className="font-semibold">Category: {loc.category}</div>
+                      <div>Department: {loc.department || "N/A"}</div>
+                      <div>Status: {loc.status}</div>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </MarkerClusterGroup>
           </MapContainer>
         )}
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Heatmap</h3>
-        {data.locations.length === 0 ? (
+        {filteredLocations.length === 0 ? (
           <p className="text-gray-600 text-sm">No location data available.</p>
         ) : (
           <MapContainer center={mapCenter} zoom={12} className="h-96 w-full rounded-lg">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <HeatmapOverlay locations={data.locations} />
+            <HeatmapOverlay locations={filteredLocations} />
           </MapContainer>
         )}
       </div>
+    </div>
+  );
+};
+
+const SummaryCard = ({ label, value }) => {
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-4">
+      <p className="text-sm text-gray-600">{label}</p>
+      <p className="text-2xl font-semibold text-gray-900">{value ?? 0}</p>
     </div>
   );
 };

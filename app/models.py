@@ -87,6 +87,10 @@ class Complaint(models.Model):
     
     # AI-based department classification
     department = models.CharField(max_length=100, blank=True, null=True)
+
+    # AI enhancements
+    sentiment = models.CharField(max_length=20, default='Neutral')
+    priority = models.CharField(max_length=10, default='NORMAL')
     
     # Geolocation data
     latitude = models.FloatField(null=True, blank=True)

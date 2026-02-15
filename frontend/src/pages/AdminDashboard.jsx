@@ -765,6 +765,95 @@ const AdminDashboard = () => {
           </>
         )}
       </div>
+
+      {showCreateVolunteerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">Create Volunteer</h3>
+              <button
+                onClick={() => setShowCreateVolunteerModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateVolunteer} className="px-5 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select User</label>
+                <select
+                  value={selectedUserId}
+                  onChange={(event) => setSelectedUserId(event.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">Choose a user</option>
+                  {availableUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.first_name || user.last_name
+                        ? `${user.first_name || ""} ${user.last_name || ""}`.trim()
+                        : user.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ward</label>
+                  <input
+                    type="text"
+                    value={volunteerData.ward}
+                    onChange={(event) =>
+                      setVolunteerData((prev) => ({ ...prev, ward: event.target.value }))
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Zone</label>
+                  <input
+                    type="text"
+                    value={volunteerData.zone}
+                    onChange={(event) =>
+                      setVolunteerData((prev) => ({ ...prev, zone: event.target.value }))
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Area</label>
+                  <input
+                    type="text"
+                    value={volunteerData.area}
+                    onChange={(event) =>
+                      setVolunteerData((prev) => ({ ...prev, area: event.target.value }))
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateVolunteerModal(false)}
+                  className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingVolunteer}
+                  className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {creatingVolunteer ? "Creating..." : "Create Volunteer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

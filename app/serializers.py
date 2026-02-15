@@ -28,11 +28,11 @@ class ComplaintSerializer(serializers.ModelSerializer):
         model = Complaint
         fields = ('id', 'title', 'description', 'category', 'department', 'latitude', 
                   'longitude', 'location', 'ward', 'zone', 'door_no', 'area_name',
-                  'status', 'support_count', 'is_public', 'verified_by_volunteer', 'verified_by_volunteer_user',
+                  'status', 'sentiment', 'priority', 'support_count', 'is_public', 'verified_by_volunteer', 'verified_by_volunteer_user',
                   'verification_notes', 'volunteer_verification_timestamp', 'admin_verified', 'admin_verification_timestamp',
                   'flag_for_admin_review', 'admin_review_reason',
                   'tracking_id', 'status_history', 'is_escalated', 'documents', 'verification_images', 'user', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'category', 'department', 'support_count', 'user', 'created_at', 'updated_at', 'verified_by_volunteer_user', 'volunteer_verification_timestamp', 'admin_verified', 'admin_verification_timestamp')
+        read_only_fields = ('id', 'category', 'department', 'sentiment', 'priority', 'support_count', 'user', 'created_at', 'updated_at', 'verified_by_volunteer_user', 'volunteer_verification_timestamp', 'admin_verified', 'admin_verification_timestamp')
 
 
 class VolunteerSerializer(serializers.ModelSerializer):

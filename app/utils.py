@@ -155,6 +155,34 @@ def export_complaint_pdf_simple(complaint):
         return text.encode('utf-8')
 
 
+def get_sentiment(text):
+    """Return Positive, Negative, or Neutral sentiment."""
+    if not text:
+        return "Neutral"
+
+    try:
+        from textblob import TextBlob
+    except ImportError:
+        return "Neutral"
+
+    polarity = TextBlob(text).sentiment.polarity
+    if polarity > 0:
+        return "Positive"
+    if polarity < 0:
+        return "Negative"
+    return "Neutral"
+
+
+def predict_priority(text):
+    """Basic keyword-based priority prediction."""
+    urgent_keywords = ["urgent", "immediately", "danger", "accident", "fire", "gas", "collapse", "injury", "emergency"]
+    text_lower = (text or "").lower()
+    for word in urgent_keywords:
+        if word in text_lower:
+            return "HIGH"
+    return "NORMAL"
+
+
 def validate_verification_image(file_obj, complaint):
     """
     Comprehensive validation for volunteer verification images.

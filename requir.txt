@@ -8,3 +8,5 @@ pytest-django
 django-cors-headers
 pandas
 scikit-learn
+openpyxl
+textblob
