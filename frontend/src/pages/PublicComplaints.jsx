@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Filter, MapPin, ThumbsUp } from 'lucide-react'
-import { api } from '../services/api'
+import api from '../services/api'
 
 function PublicComplaints() {
   const navigate = useNavigate()
@@ -40,6 +40,19 @@ function PublicComplaints() {
   const filteredComplaints = complaints.filter(complaint =>
     complaint.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     complaint.description.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const groupedComplaints = filteredComplaints.reduce((groups, complaint) => {
+    const category = complaint.category || complaint.department || 'Uncategorized'
+    if (!groups[category]) {
+      groups[category] = []
+    }
+    groups[category].push(complaint)
+    return groups
+  }, {})
+
+  const groupedEntries = Object.entries(groupedComplaints).sort((a, b) =>
+    a[0].localeCompare(b[0])
   )
 
   return (
@@ -116,49 +129,55 @@ function PublicComplaints() {
 
         {/* Complaints Grid */}
         {!loading && filteredComplaints.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredComplaints.map(complaint => (
-              <div
-                key={complaint.id}
-                onClick={() => navigate(`/complaint/${complaint.id}`)}
-                className="bg-white rounded-lg shadow-md hover:shadow-lg hover:border-blue-500 cursor-pointer transition border border-gray-200"
-              >
-                {/* Card Header */}
-                <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
-                  <h3 className="font-semibold text-lg mb-2 line-clamp-2">{complaint.title}</h3>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="bg-blue-700 px-2 py-1 rounded text-xs font-medium">
-                      {complaint.department || complaint.category}
-                    </span>
-                    <span className="bg-blue-700 px-2 py-1 rounded text-xs font-medium capitalize">
-                      {complaint.status}
-                    </span>
-                  </div>
+          <div className="space-y-8">
+            {groupedEntries.map(([category, categoryComplaints]) => (
+              <div key={category}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900">{category}</h2>
+                  <span className="text-sm text-gray-600">
+                    {categoryComplaints.length} complaint{categoryComplaints.length !== 1 ? 's' : ''}
+                  </span>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {categoryComplaints.map(complaint => (
+                    <div
+                      key={complaint.id}
+                      onClick={() => navigate(`/complaint/${complaint.id}`)}
+                      className="bg-white rounded-lg shadow-md hover:shadow-lg hover:border-blue-500 cursor-pointer transition border border-gray-200"
+                    >
+                      <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
+                        <h3 className="font-semibold text-lg mb-2 line-clamp-2">{complaint.title}</h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="bg-blue-700 px-2 py-1 rounded text-xs font-medium">
+                            {complaint.department || complaint.category}
+                          </span>
+                          <span className="bg-blue-700 px-2 py-1 rounded text-xs font-medium capitalize">
+                            {complaint.status}
+                          </span>
+                        </div>
+                      </div>
 
-                {/* Card Body */}
-                <div className="p-4">
-                  {/* Location */}
-                  <div className="flex items-start gap-2 mb-3 text-gray-700">
-                    <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm line-clamp-2">{complaint.location}</p>
-                  </div>
+                      <div className="p-4">
+                        <div className="flex items-start gap-2 mb-3 text-gray-700">
+                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0 mt-0.5" />
+                          <p className="text-sm line-clamp-2">{complaint.location}</p>
+                        </div>
 
-                  {/* Description */}
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                    {complaint.description}
-                  </p>
+                        <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                          {complaint.description}
+                        </p>
 
-                  {/* Support Count */}
-                  <div className="flex items-center gap-2 text-blue-600 font-semibold">
-                    <ThumbsUp className="h-4 w-4" />
-                    <span>{complaint.support_count} support{complaint.support_count !== 1 ? 's' : ''}</span>
-                  </div>
+                        <div className="flex items-center gap-2 text-blue-600 font-semibold">
+                          <ThumbsUp className="h-4 w-4" />
+                          <span>{complaint.support_count} support{complaint.support_count !== 1 ? 's' : ''}</span>
+                        </div>
 
-                  {/* Date */}
-                  <p className="text-xs text-gray-500 mt-3 pt-3 border-t">
-                    {new Date(complaint.created_at).toLocaleDateString()}
-                  </p>
+                        <p className="text-xs text-gray-500 mt-3 pt-3 border-t">
+                          {new Date(complaint.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}

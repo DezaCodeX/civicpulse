@@ -69,11 +69,12 @@ export const syncSupabaseWithDjango = async (supabaseSession) => {
 /**
  * Perform Supabase Google OAuth login
  */
-export const signInWithGoogle = async () => {
+export const signInWithGoogle = async (redirectPath = "/dashboard") => {
   try {
     // Build a redirect URL that matches whatever port the app is running on
     const origin = typeof window !== 'undefined' ? window.location.origin : (import.meta.env.VITE_SUPABASE_REDIRECT_URL || 'http://localhost:3000');
-    const redirectTo = `${origin}/dashboard`;
+    const normalizedPath = redirectPath.startsWith("/") ? redirectPath : `/${redirectPath}`;
+    const redirectTo = `${origin}${normalizedPath}`;
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",

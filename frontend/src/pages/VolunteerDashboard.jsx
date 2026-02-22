@@ -187,6 +187,19 @@ const VolunteerDashboard = () => {
     });
   };
 
+  const complaintsByCategory = complaints.reduce((groups, complaint) => {
+    const category = complaint.category || complaint.department || "Uncategorized";
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category].push(complaint);
+    return groups;
+  }, {});
+
+  const complaintCategoryEntries = Object.entries(complaintsByCategory).sort((a, b) =>
+    a[0].localeCompare(b[0])
+  );
+
   if (!volunteerInfo) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -364,12 +377,20 @@ const VolunteerDashboard = () => {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {complaints.map((complaint) => (
-                  <div
-                    key={complaint.id}
-                    className="bg-white rounded-lg shadow-sm hover:shadow-md transition overflow-hidden"
-                  >
+              <div className="space-y-6">
+                {complaintCategoryEntries.map(([category, categoryComplaints]) => (
+                  <div key={category} className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-gray-900">{category}</h3>
+                      <p className="text-xs text-gray-500">
+                        {categoryComplaints.length} complaint{categoryComplaints.length !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    {categoryComplaints.map((complaint) => (
+                      <div
+                        key={complaint.id}
+                        className="bg-white rounded-lg shadow-sm hover:shadow-md transition overflow-hidden"
+                      >
                     {/* Complaint Card Header */}
                     <div
                       className="p-6 cursor-pointer hover:bg-gray-50 transition"
@@ -571,6 +592,8 @@ const VolunteerDashboard = () => {
                         </div>
                       </div>
                     )}
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>

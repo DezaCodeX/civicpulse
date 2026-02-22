@@ -141,7 +141,11 @@ function SubmitComplaint() {
       console.log('SubmitComplaint: Submitting complaint with', files.length, 'files')
       
       // Submit to Django backend with file uploads
-      const response = await api.post('/api/complaints/create/', submitData)
+      const response = await api.post('/api/complaints/create/', submitData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
       
       console.log('SubmitComplaint: Response:', response.data)
       setSuccess('Complaint submitted successfully!')

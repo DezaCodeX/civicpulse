@@ -244,6 +244,19 @@ const AdminDashboard = () => {
     }
   };
 
+  const complaintsByCategory = complaints.reduce((groups, complaint) => {
+    const category = complaint.category || complaint.department || "Uncategorized";
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category].push(complaint);
+    return groups;
+  }, {});
+
+  const complaintCategoryEntries = Object.entries(complaintsByCategory).sort((a, b) =>
+    a[0].localeCompare(b[0])
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -352,47 +365,75 @@ const AdminDashboard = () => {
                 </div>
 
                 {/* Complaints List */}
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {complaints.length === 0 ? (
                     <div className="bg-white rounded-lg shadow-sm p-12 text-center">
                       <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                       <p className="text-gray-600">No complaints found</p>
                     </div>
                   ) : (
-                    complaints.map((complaint) => (
-                      <div
-                        key={complaint.id}
-                        className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-600"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-gray-900">{complaint.title}</h4>
-                            <p className="text-gray-600 text-sm mt-1">
-                              By: {complaint.user.name} ({complaint.user.email})
-                            </p>
-                            <p className="text-gray-600 text-sm mt-1">
-                              Department: {complaint.department}
-                            </p>
-                            <p className="text-gray-600 text-sm">
-                              Status: {complaint.status}
-                            </p>
-                          </div>
-                          <select
-                            value={complaint.status}
-                            onChange={(e) =>
-                              handleComplaintStatusChange(
-                                complaint.id,
-                                e.target.value
-                              )
-                            }
-                            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="resolved">Resolved</option>
-                            <option value="rejected">Rejected</option>
-                          </select>
+                    complaintCategoryEntries.map(([category, categoryComplaints]) => (
+                      <div key={category} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-gray-900">{category}</h4>
+                          <p className="text-xs text-gray-500">
+                            {categoryComplaints.length} complaint{categoryComplaints.length !== 1 ? "s" : ""}
+                          </p>
                         </div>
+                        {categoryComplaints.map((complaint) => (
+                          <div
+                            key={complaint.id}
+                            className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-600"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-900">{complaint.title}</h4>
+                                <p className="text-gray-600 text-sm mt-1">
+                                  By: {complaint.user.name} ({complaint.user.email})
+                                </p>
+                                <p className="text-gray-600 text-sm mt-1">
+                                  Department: {complaint.department}
+                                </p>
+                                <p className="text-gray-600 text-sm">
+                                  Status: {complaint.status}
+                                </p>
+                                <p className="text-gray-600 text-sm">
+                                  Attachments: {complaint.documents_count || 0}
+                                </p>
+                                {complaint.documents && complaint.documents.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {complaint.documents.map((doc) => (
+                                      <a
+                                        key={doc.id}
+                                        href={doc.file}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                      >
+                                        {doc.file_name}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <select
+                                value={complaint.status}
+                                onChange={(e) =>
+                                  handleComplaintStatusChange(
+                                    complaint.id,
+                                    e.target.value
+                                  )
+                                }
+                                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="rejected">Rejected</option>
+                              </select>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ))
                   )}

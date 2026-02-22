@@ -7,32 +7,27 @@ const api = axios.create({
   },
 });
 
-api.interceptors.request.use(config => {
+api.interceptors.request.use((config) => {
+  const requestUrl = config.url || "";
+  const isPublicEndpoint = requestUrl.includes("/api/public/");
   const token = localStorage.getItem("access");
-  console.log('🔐 Request Interceptor:', {
-    url: config.url,
-    method: config.method,
-    hasToken: !!token,
-    tokenPreview: token ? token.substring(0, 20) + '...' : 'null'
-  });
-  
-  if (token) {
+
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    delete config.headers["Content-Type"];
+  }
+
+  if (token && !isPublicEndpoint) {
     config.headers.Authorization = `Bearer ${token}`;
   } else {
-    console.warn('⚠️ No token found in localStorage! Keys:', Object.keys(localStorage));
+    delete config.headers.Authorization;
   }
+
   return config;
 });
 
 api.interceptors.response.use(
-  response => response,
-  error => {
-    if (error.response?.status === 401) {
-      console.error('❌ 401 Unauthorized - Token may be invalid or expired');
-      console.log('Token in localStorage:', localStorage.getItem('access') ? '✅ Present' : '❌ Missing');
-    }
-    return Promise.reject(error);
-  }
+  (response) => response,
+  (error) => Promise.reject(error)
 );
 
 export { api };
