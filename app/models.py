@@ -152,6 +152,21 @@ class Complaint(models.Model):
         super().save(*args, **kwargs)
 
 
+class ComplaintSupport(models.Model):
+    complaint = models.ForeignKey(Complaint, on_delete=models.CASCADE, related_name='supports')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='supported_complaints')
+    supported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-supported_at']
+        constraints = [
+            models.UniqueConstraint(fields=['complaint', 'user'], name='unique_user_support_per_complaint')
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} supported {self.complaint.id}"
+
+
 class ComplaintDocument(models.Model):
     """Store multiple file attachments for each complaint"""
     complaint = models.ForeignKey(
@@ -184,6 +199,13 @@ class Volunteer(models.Model):
 
 class VerificationImage(models.Model):
     complaint = models.ForeignKey(Complaint, on_delete=models.CASCADE, related_name='verification_images')
+    volunteer = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='verification_images_uploaded'
+    )
     image = models.ImageField(upload_to='verification/%Y/%m/%d/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
 

@@ -143,37 +143,130 @@ function PublicComplaints() {
                     <div
                       key={complaint.id}
                       onClick={() => navigate(`/complaint/${complaint.id}`)}
-                      className="bg-white rounded-lg shadow-md hover:shadow-lg hover:border-blue-500 cursor-pointer transition border border-gray-200"
+                      className="bg-white rounded-lg shadow-md hover:shadow-lg hover:border-blue-500 cursor-pointer transition border border-gray-200 overflow-hidden"
                     >
                       <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
-                        <h3 className="font-semibold text-lg mb-2 line-clamp-2">{complaint.title}</h3>
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-lg mb-2 line-clamp-2">{complaint.title}</h3>
+                          </div>
+                          {/* Verification Status Badge in Header */}
+                          <div className="flex flex-col gap-2 flex-shrink-0">
+                            {complaint.verified_by_volunteer && (
+                              <span className="inline-flex items-center justify-center bg-green-400 text-green-900 text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap">
+                                ✓ VOLUNTEER VERIFIED
+                              </span>
+                            )}
+                            {complaint.admin_verified && (
+                              <span className="inline-flex items-center justify-center bg-yellow-300 text-yellow-900 text-xs px-3 py-1 rounded-full font-bold whitespace-nowrap">
+                                ✓ ADMIN VERIFIED
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="bg-blue-700 px-2 py-1 rounded text-xs font-medium">
                             {complaint.department || complaint.category}
                           </span>
-                          <span className="bg-blue-700 px-2 py-1 rounded text-xs font-medium capitalize">
-                            {complaint.status}
+                          <span className={`px-2 py-1 rounded text-xs font-medium capitalize ${
+                            complaint.status === 'pending' ? 'bg-yellow-600' :
+                            complaint.status === 'in_progress' ? 'bg-blue-700' :
+                            complaint.status === 'resolved' ? 'bg-green-600' :
+                            'bg-red-600'
+                          }`}>
+                            {complaint.status.replace('_', ' ')}
                           </span>
+                          {complaint.priority && (
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              complaint.priority === 'HIGH' ? 'bg-red-600' :
+                              complaint.priority === 'MEDIUM' ? 'bg-orange-600' :
+                              'bg-green-600'
+                            }`}>
+                              {complaint.priority}
+                            </span>
+                          )}
                         </div>
                       </div>
 
                       <div className="p-4">
+                        {/* Tracking ID */}
+                        <p className="text-xs text-gray-500 mb-2">
+                          ID: {complaint.id} | Tracking: {complaint.tracking_id}
+                        </p>
+
+                        {/* Location */}
                         <div className="flex items-start gap-2 mb-3 text-gray-700">
                           <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0 mt-0.5" />
                           <p className="text-sm line-clamp-2">{complaint.location}</p>
                         </div>
 
-                        <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                        {/* Description */}
+                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                           {complaint.description}
                         </p>
 
-                        <div className="flex items-center gap-2 text-blue-600 font-semibold">
+                        {/* Flagged for Review Badge (only show in body if flagged) */}
+                        {complaint.flag_for_admin_review && (
+                          <div className="mb-3 flex items-center gap-2 bg-yellow-50 border border-yellow-300 rounded p-2">
+                            <span className="text-lg">⚠</span>
+                            <span className="text-xs font-semibold text-yellow-800">Flagged for Admin Review</span>
+                          </div>
+                        )}
+
+                        {/* Volunteer Notes */}
+                        {complaint.verification_notes && (
+                          <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
+                            <p className="text-xs font-semibold text-blue-900 mb-1">Volunteer Notes:</p>
+                            <p className="text-xs text-blue-800 line-clamp-2">{complaint.verification_notes}</p>
+                          </div>
+                        )}
+
+                        {/* Admin Notes */}
+                        {complaint.admin_review_reason && (
+                          <div className="mb-3 p-2 bg-amber-50 rounded border border-amber-200">
+                            <p className="text-xs font-semibold text-amber-900 mb-1">Admin Notes:</p>
+                            <p className="text-xs text-amber-800 line-clamp-2">{complaint.admin_review_reason}</p>
+                          </div>
+                        )}
+
+                        {/* Verification Images Thumbnails */}
+                        {complaint.verification_images_count > 0 && (
+                          <div className="mb-3">
+                            <p className="text-xs font-semibold text-gray-700 mb-2">
+                              Proof Images ({complaint.verification_images_count})
+                            </p>
+                            <div className="flex gap-2 overflow-x-auto">
+                              {complaint.verification_images.slice(0, 3).map(img => (
+                                <a
+                                  key={img.id}
+                                  href={img.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex-shrink-0 h-16 w-16 bg-gray-100 rounded overflow-hidden border border-gray-300 hover:border-blue-500 transition"
+                                >
+                                  <img src={img.url} alt="proof" className="h-full w-full object-cover" />
+                                </a>
+                              ))}
+                              {complaint.verification_images_count > 3 && (
+                                <div className="flex-shrink-0 h-16 w-16 bg-gray-200 rounded flex items-center justify-center text-xs font-semibold text-gray-600">
+                                  +{complaint.verification_images_count - 3}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Support Count */}
+                        <div className="flex items-center gap-2 text-blue-600 font-semibold mb-3">
                           <ThumbsUp className="h-4 w-4" />
                           <span>{complaint.support_count} support{complaint.support_count !== 1 ? 's' : ''}</span>
                         </div>
 
-                        <p className="text-xs text-gray-500 mt-3 pt-3 border-t">
-                          {new Date(complaint.created_at).toLocaleDateString()}
+                        {/* Created Date */}
+                        <p className="text-xs text-gray-500 pt-2 border-t">
+                          {new Date(complaint.created_at).toLocaleDateString()} at {new Date(complaint.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </p>
                       </div>
                     </div>

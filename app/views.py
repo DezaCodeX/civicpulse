@@ -2,7 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import MyTokenObtainPairSerializer, RegisterSerializer, CustomUserSerializer, ComplaintSerializer
-from .models import CustomUser, Complaint, ComplaintDocument, Volunteer, VerificationImage, CivicContact
+from .models import CustomUser, Complaint, ComplaintDocument, Volunteer, VerificationImage, CivicContact, ComplaintSupport
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Count, Q
@@ -13,6 +13,9 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.timezone import now
 from app.utils import get_sentiment, predict_priority
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Import AI prediction module
 from app.ai.predict import predict_department
@@ -210,7 +213,8 @@ def complaint_list_create(request):
         
         serializer = ComplaintSerializer(data=data)
         if serializer.is_valid():
-            serializer.save(user=request.user)
+            complaint = serializer.save(user=request.user)
+            _send_complaint_creation_confirmation(request, complaint)
             response_data = serializer.data
             response_data['confidence'] = round(float(confidence), 3)
             return Response(response_data, status=201)
@@ -350,6 +354,7 @@ def create_complaint_with_files(request):
             location=location or f"({latitude}, {longitude})",
             is_public=True
         )
+        _send_complaint_creation_confirmation(request, complaint)
         
         # Phase 4: Reverse-geocode to populate ward/zone/area_name
         if latitude and longitude:
@@ -454,13 +459,22 @@ def upload_verification_image(request, complaint_id):
         }, status=status.HTTP_400_BAD_REQUEST)
     
     # Create verification image
-    vi = VerificationImage.objects.create(complaint=complaint, image=img)
+    vi = VerificationImage.objects.create(complaint=complaint, image=img, volunteer=request.user)
     
     # Flag for admin review if validation warnings exist
     if validation['should_flag_for_review']:
         complaint.flag_for_admin_review = True
         complaint.admin_review_reason = 'Image validation warning: ' + ', '.join(validation['warnings'])
         complaint.save()
+    
+    # Send notification email about verification image upload
+    _send_complaint_status_notification(
+        request,
+        complaint,
+        event_title='Verification Proof Image Uploaded',
+        actor_email=request.user.email,
+        reason=f"Volunteer {request.user.first_name} {request.user.last_name} has uploaded verification proof image(s).",
+    )
     
     response_data = {
         'message': 'Image uploaded successfully',
@@ -469,6 +483,205 @@ def upload_verification_image(request, complaint_id):
     }
     
     return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+def _complaint_notification_recipients(complaint):
+    recipients = set()
+    if complaint.user and complaint.user.email:
+        recipients.add(complaint.user.email)
+    if complaint.verified_by_volunteer_user and complaint.verified_by_volunteer_user.email:
+        recipients.add(complaint.verified_by_volunteer_user.email)
+    for support in complaint.supports.select_related('user').all():
+        if support.user and support.user.email:
+            recipients.add(support.user.email)
+    return list(recipients)
+
+
+def _verification_image_urls(request, complaint):
+    return [
+        request.build_absolute_uri(vi.image.url)
+        for vi in complaint.verification_images.all()
+    ]
+
+
+def _format_complaint_details(complaint, request=None):
+    """
+    Format comprehensive complaint details for inclusion in emails.
+    """
+    details = (
+        f"COMPLAINT SUMMARY:\n"
+        f"==================\n"
+        f"Complaint Number: {complaint.id}\n"
+        f"Tracking ID: {complaint.tracking_id}\n"
+        f"Title: {complaint.title}\n"
+        f"Description: {complaint.description}\n"
+        f"Department: {complaint.department}\n"
+        f"Category: {complaint.category}\n"
+        f"Status: {complaint.status}\n"
+        f"Priority: {complaint.priority}\n"
+        f"Sentiment: {complaint.sentiment}\n"
+        f"Created: {complaint.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"Location: {complaint.location or 'N/A'}\n"
+        f"Ward/Zone/Area: {complaint.ward or 'N/A'} / {complaint.zone or 'N/A'} / {complaint.area_name or 'N/A'}\n\n"
+    )
+    
+    # Citizen info
+    if complaint.user:
+        details += (
+            f"CITIZEN (Complaint Creator):\n"
+            f"===========================\n"
+            f"Name: {complaint.user.first_name} {complaint.user.last_name}\n"
+            f"Email: {complaint.user.email}\n"
+            f"Phone: {complaint.user.phone_number or 'N/A'}\n\n"
+        )
+    
+    # Volunteer info
+    if complaint.verified_by_volunteer_user:
+        details += (
+            f"VOLUNTEER (Verifying Party):\n"
+            f"============================\n"
+            f"Name: {complaint.verified_by_volunteer_user.first_name} {complaint.verified_by_volunteer_user.last_name}\n"
+            f"Email: {complaint.verified_by_volunteer_user.email}\n"
+            f"Verified: {'Yes' if complaint.verified_by_volunteer else 'No'}\n"
+            f"Verification Notes: {complaint.verification_notes or 'None'}\n\n"
+        )
+    
+    # Supporters
+    supporter_count = complaint.supports.count() if complaint.supports.exists() else complaint.support_count
+    details += (
+        f"SUPPORTERS ({supporter_count}):\n"
+        f"================\n"
+    )
+    if supporter_count > 0:
+        for support in complaint.supports.select_related('user').all():
+            details += f"- {support.user.first_name} {support.user.last_name} ({support.user.email}) - Supported: {support.supported_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+    else:
+        details += "No supporters yet\n"
+    details += "\n"
+    
+    # Documents
+    docs = complaint.documents.all()
+    details += (
+        f"ATTACHED DOCUMENTS ({docs.count()}):\n"
+        f"============================\n"
+    )
+    if docs.count() > 0:
+        for doc in docs:
+            details += f"- {doc.file_name} ({doc.file_size} bytes) - Uploaded: {doc.uploaded_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            if request:
+                details += f"  URL: {request.build_absolute_uri(doc.file.url)}\n"
+    else:
+        details += "No documents attached\n"
+    details += "\n"
+    
+    # Verification Images
+    images = complaint.verification_images.all()
+    details += (
+        f"VERIFICATION PROOF IMAGES ({images.count()}):\n"
+        f"==================================\n"
+    )
+    if images.count() > 0:
+        for img in images:
+            details += f"- Uploaded: {img.uploaded_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            if img.volunteer:
+                details += f"  Uploaded by: {img.volunteer.first_name} {img.volunteer.last_name}\n"
+            if request:
+                details += f"  URL: {request.build_absolute_uri(img.image.url)}\n"
+    else:
+        details += "No verification images\n"
+    details += "\n"
+    
+    return details
+
+
+def _send_complaint_creation_confirmation(request, complaint):
+    """
+    Send confirmation email when a complaint is created.
+    Notifies the CITIZEN with their complaint number and tracking ID.
+    """
+    if not complaint.user or not complaint.user.email:
+        return
+    
+    message = (
+        f"Dear {complaint.user.first_name or 'User'},\n\n"
+        f"*** You are receiving this email because YOU CREATED THIS COMPLAINT ***\n\n"
+        f"Your complaint has been successfully registered in CivicPulse.\n\n"
+        f"Save your TRACKING ID for future reference: {complaint.tracking_id}\n\n"
+    )
+    message += _format_complaint_details(complaint, request)
+    message += (
+        f"NEXT STEPS:\n"
+        f"===========\n"
+        f"1. A volunteer will verify your complaint details\n"
+        f"2. Once verified, your complaint will be public and open for support\n"
+        f"3. Other citizens can support your complaint\n"
+        f"4. You will receive email updates on every status change\n\n"
+        f"Thank you for using CivicPulse.\n"
+        f"Best regards,\nCivicPulse Team"
+    )
+    
+    try:
+        send_mail(
+            subject=f"CivicPulse: Complaint Registered #{complaint.id} - Tracking: {complaint.tracking_id}",
+            message=message,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@example.com'),
+            recipient_list=[complaint.user.email],
+            fail_silently=True,
+        )
+    except Exception:
+        logger.error("Failed sending complaint creation confirmation", exc_info=True)
+
+
+def _send_complaint_status_notification(request, complaint, event_title, actor_email, reason='', extra_recipients=None):
+    """
+    Send comprehensive status update email to ALL stakeholders:
+    - Citizen (complaint creator)
+    - Volunteer (who verified)
+    - All supporters
+    
+    Includes all complaint details, documents, images, and subscriber information.
+    """
+    recipients = _complaint_notification_recipients(complaint)
+    if extra_recipients:
+        recipients.extend(extra_recipients)
+        recipients = list(set(filter(None, recipients)))
+    if not recipients:
+        return
+
+    message = (
+        f"*** COMPLAINT STATUS UPDATE ***\n\n"
+        f"This is a notification to ALL parties involved with this complaint.\n"
+        f"Recipients: Complaint Creator, Volunteer Verifier, and all Supporters\n\n"
+        f"EVENT: {event_title}\n"
+        f"Updated By: {actor_email}\n"
+        f"Updated At: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    )
+    
+    if reason:
+        message += f"REASON/NOTES:\n{reason}\n\n"
+    
+    message += _format_complaint_details(complaint, request)
+    
+    message += (
+        f"VERIFICATION STATUS:\n"
+        f"================\n"
+        f"Volunteer Verified: {'Yes' if complaint.verified_by_volunteer else 'No'}\n"
+        f"Admin Verified: {'Yes' if complaint.admin_verified else 'No'}\n"
+        f"Flagged for Review: {'Yes' if complaint.flag_for_admin_review else 'No'}\n\n"
+        f"Thank you for being part of CivicPulse.\n"
+        f"Best regards,\nCivicPulse Team"
+    )
+
+    try:
+        send_mail(
+            subject=f"CivicPulse Update: {event_title} - Complaint #{complaint.id}",
+            message=message,
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@example.com'),
+            recipient_list=recipients,
+            fail_silently=True,
+        )
+    except Exception:
+        logger.error("Failed sending complaint status notification", exc_info=True)
 
 
 
@@ -499,19 +712,35 @@ def verify_complaint(request, complaint_id):
         complaint.verified_by_volunteer = True
         complaint.verified_by_volunteer_user = request.user
         complaint.volunteer_verification_timestamp = now()
+        complaint.status = 'in_progress'
         complaint.verification_notes = notes
         entry = {'ts': now().isoformat(), 'actor': request.user.email, 'action': 'approved', 'notes': notes}
         complaint.status_history = complaint.status_history + [entry]
         complaint.save()
+        _send_complaint_status_notification(
+            request,
+            complaint,
+            event_title='Approved by Volunteer',
+            actor_email=request.user.email,
+            reason=notes,
+        )
         return Response({'message': 'Complaint approved by volunteer'}, status=status.HTTP_200_OK)
     elif action == 'reject':
         complaint.verified_by_volunteer = False
-        complaint.verified_by_volunteer_user = None
-        complaint.volunteer_verification_timestamp = None
+        complaint.verified_by_volunteer_user = request.user
+        complaint.volunteer_verification_timestamp = now()
+        complaint.status = 'rejected'
         complaint.verification_notes = notes
         entry = {'ts': now().isoformat(), 'actor': request.user.email, 'action': 'rejected', 'notes': notes}
         complaint.status_history = complaint.status_history + [entry]
         complaint.save()
+        _send_complaint_status_notification(
+            request,
+            complaint,
+            event_title='Rejected by Volunteer',
+            actor_email=request.user.email,
+            reason=notes,
+        )
         return Response({'message': 'Complaint rejected by volunteer'}, status=status.HTTP_200_OK)
     else:
         return Response({'error': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
@@ -679,14 +908,33 @@ def admin_verification_queue(request):
     
     data = []
     for c in complaints:
+        supporters = [{
+            'id': str(s.user.id),
+            'name': f"{s.user.first_name} {s.user.last_name}".strip() or s.user.email,
+            'email': s.user.email,
+            'phone': s.user.phone_number,
+            'supported_at': s.supported_at,
+        } for s in c.supports.select_related('user').all()]
+
+        total_supports = c.supports.count() if c.supports.exists() else c.support_count
+
         data.append({
             'id': str(c.id),
+            'complaint_number': str(c.id),
+            'tracking_id': c.tracking_id,
             'title': c.title,
             'description': c.description,
+            'location': c.location,
+            'latitude': c.latitude,
+            'longitude': c.longitude,
+            'created_at': c.created_at,
             'citizen': {
                 'email': c.user.email,
                 'name': f"{c.user.first_name} {c.user.last_name}".strip(),
-                'phone': c.user.phone_number
+                'phone': c.user.phone_number,
+                'address': c.user.address,
+                'city': c.user.city,
+                'state': c.user.state,
             },
             'volunteer': {
                 'email': c.verified_by_volunteer_user.email if c.verified_by_volunteer_user else 'N/A',
@@ -694,8 +942,25 @@ def admin_verification_queue(request):
             },
             'verification_notes': c.verification_notes,
             'verification_images': [
-                {'id': str(vi.id), 'url': vi.image.url, 'uploaded_at': vi.uploaded_at}
+                {'id': str(vi.id), 'url': request.build_absolute_uri(vi.image.url), 'uploaded_at': vi.uploaded_at}
                 for vi in c.verification_images.all()
+            ],
+            'documents': [{
+                'id': str(doc.id),
+                'file_name': doc.file_name,
+                'file_size': doc.file_size,
+                'file': request.build_absolute_uri(doc.file.url),
+                'uploaded_at': doc.uploaded_at,
+            } for doc in c.documents.all()],
+            'support_total': total_supports,
+            'total_supports': total_supports,
+            'supporters': supporters,
+            'supporter_details': [
+                {
+                    'name': supporter['name'],
+                    'email': supporter['email'],
+                }
+                for supporter in supporters
             ],
             'volunteer_verification_timestamp': c.volunteer_verification_timestamp,
             'ward': c.ward,
@@ -739,22 +1004,39 @@ def admin_verify_complaint(request, complaint_id):
         complaint.admin_verified = True
         complaint.admin_verification_timestamp = now()
         complaint.is_public = True
-        complaint.status = 'verified'
+        complaint.status = 'in_progress'
         entry = {'ts': now().isoformat(), 'actor': request.user.email, 'action': 'admin_verified', 'reason': reason}
         complaint.status_history = complaint.status_history + [entry]
         complaint.save()
+        _send_complaint_status_notification(
+            request,
+            complaint,
+            event_title='Approved by Admin',
+            actor_email=request.user.email,
+            reason=reason,
+        )
         return Response({'message': 'Complaint verified by admin and now public'}, status=status.HTTP_200_OK)
     
     elif action == 'reject':
+        volunteer_email = complaint.verified_by_volunteer_user.email if complaint.verified_by_volunteer_user else None
         complaint.verified_by_volunteer = False
         complaint.verified_by_volunteer_user = None
         complaint.volunteer_verification_timestamp = None
         complaint.admin_verified = False
         complaint.is_public = False
+        complaint.status = 'rejected'
         complaint.admin_review_reason = reason
         entry = {'ts': now().isoformat(), 'actor': request.user.email, 'action': 'admin_rejected', 'reason': reason}
         complaint.status_history = complaint.status_history + [entry]
         complaint.save()
+        _send_complaint_status_notification(
+            request,
+            complaint,
+            event_title='Rejected by Admin',
+            actor_email=request.user.email,
+            reason=reason,
+            extra_recipients=[volunteer_email] if volunteer_email else None,
+        )
         return Response({'message': 'Volunteer verification rejected by admin'}, status=status.HTTP_200_OK)
     
     else:
@@ -971,20 +1253,12 @@ def public_complaint_detail(request, complaint_id):
 def public_complaints_list(request):
     """
     List all public complaints (anonymized for public view).
-    Only shows complaints that meet ALL criteria:
-    - is_public == True
-    - verified_by_volunteer == True
-    - admin_verified == True
+    Shows ALL complaints marked is_public=True, regardless of verification status.
+    Includes volunteer verification notes and admin notes.
     Supports filtering by department, category, status.
     """
-    public_complaints = Complaint.objects.filter(is_public=True)
-    complaints = public_complaints.filter(
-        verified_by_volunteer=True,
-        admin_verified=True
-    )
-    # Fallback: if no fully verified public complaints exist yet, still list public complaints.
-    if not complaints.exists():
-        complaints = public_complaints
+    # Get all complaints marked as public
+    complaints = Complaint.objects.filter(is_public=True).order_by('-created_at')
     
     # Filtering
     department = request.query_params.get('department')
@@ -1004,31 +1278,42 @@ def public_complaints_list(request):
     if zone:
         complaints = complaints.filter(zone=zone)
     
-    # Ordering
-    complaints = complaints.order_by('-created_at')
-    
     data = [{
         'id': str(c.id),
+        'tracking_id': c.tracking_id,
         'title': c.title,
         'description': c.description,
         'department': c.department,
         'category': c.category,
+        'priority': c.priority,
+        'sentiment': c.sentiment,
         'support_count': c.support_count,
         'status': c.status,
         'created_at': c.created_at,
         'location': c.location,
+        'latitude': c.latitude,
+        'longitude': c.longitude,
         'ward': c.ward,
         'zone': c.zone,
         'area': c.area_name,
         'verified_by_volunteer': c.verified_by_volunteer,
         'admin_verified': c.admin_verified,
+        'verification_notes': c.verification_notes or '',
+        'admin_review_reason': c.admin_review_reason or '',
+        'flag_for_admin_review': c.flag_for_admin_review,
         'documents_count': c.documents.count(),
         'documents': [{
             'id': str(doc.id),
             'name': doc.file_name,
             'url': request.build_absolute_uri(doc.file.url),
             'size': doc.file_size
-        } for doc in c.documents.all()]
+        } for doc in c.documents.all()],
+        'verification_images_count': c.verification_images.count(),
+        'verification_images': [{
+            'id': str(img.id),
+            'url': request.build_absolute_uri(img.image.url),
+            'uploaded_at': img.uploaded_at
+        } for img in c.verification_images.all()]
     } for c in complaints]
     
     return Response(data)
@@ -1037,20 +1322,35 @@ def public_complaints_list(request):
 # ==================== MODULE 5: SUPPORT/VOTING SYSTEM ====================
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def support_complaint(request, complaint_id):
     """
-    Increment support count for a complaint.
-    Uses IP address to prevent duplicate votes.
+    Support a complaint as an authenticated user.
+    Prevents duplicate support from same user.
     """
     try:
         complaint = Complaint.objects.get(id=complaint_id)
-        complaint.support_count += 1
-        complaint.save()
+        supporter = request.user
+        if not supporter.profile_complete:
+            return Response({'error': 'Complete your profile before supporting complaints'}, status=status.HTTP_400_BAD_REQUEST)
+
+        support_obj, created = ComplaintSupport.objects.get_or_create(
+            complaint=complaint,
+            user=supporter,
+        )
+        if not created:
+            return Response(
+                {'error': 'You have already supported this complaint', 'support_count': complaint.support_count},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        complaint.support_count = complaint.supports.count()
+        complaint.save(update_fields=['support_count', 'updated_at'])
         
         return Response({
             'id': str(complaint.id),
             'support_count': complaint.support_count,
+            'supported_at': support_obj.supported_at,
             'message': 'Support recorded'
         })
     except Complaint.DoesNotExist:
@@ -1112,7 +1412,7 @@ def admin_complaints_list(request):
     return Response(data)
 
 
-@api_view(['PATCH'])
+@api_view(['PATCH', 'POST'])
 @permission_classes([IsAuthenticated])
 def admin_update_complaint_status(request, complaint_id):
     """
@@ -1126,24 +1426,18 @@ def admin_update_complaint_status(request, complaint_id):
         new_status = request.data.get('status')
         
         if new_status:
+            reason = request.data.get('reason', '')
             complaint.status = new_status
             entry = {'ts': now().isoformat(), 'actor': request.user.email, 'action': f'status:{new_status}'}
             complaint.status_history = complaint.status_history + [entry]
             complaint.save()
-
-            # Send notification email to complaint owner if email exists
-            try:
-                if complaint.user and complaint.user.email:
-                    send_mail(
-                        'Complaint Status Updated',
-                        f'Your complaint {complaint.tracking_id or complaint.id} is now {new_status}',
-                        getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@example.com'),
-                        [complaint.user.email],
-                        fail_silently=True
-                    )
-            except Exception:
-                # don't fail the request if email sending fails
-                pass
+            _send_complaint_status_notification(
+                request,
+                complaint,
+                event_title='Status Updated by Admin',
+                actor_email=request.user.email,
+                reason=reason or f'New status: {new_status}',
+            )
         
         return Response({
             'id': str(complaint.id),

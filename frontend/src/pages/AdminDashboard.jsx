@@ -466,9 +466,24 @@ const AdminDashboard = () => {
                           </p>
                           <div className="text-sm text-gray-600 space-y-1">
                             <p>
+                              <strong>Complaint Number:</strong> {complaint.complaint_number || complaint.id}
+                            </p>
+                            <p>
+                              <strong>Tracking ID:</strong> {complaint.tracking_id || "N/A"}
+                            </p>
+                            <p>
+                              <strong>Created At:</strong>{" "}
+                              {complaint.created_at
+                                ? new Date(complaint.created_at).toLocaleString()
+                                : "N/A"}
+                            </p>
+                            <p>
                               <strong>Citizen:</strong> {complaint.citizen.name} ({
                                 complaint.citizen.email
                               })
+                            </p>
+                            <p>
+                              <strong>Citizen Phone:</strong> {complaint.citizen.phone || "N/A"}
                             </p>
                             <p>
                               <strong>Volunteer:</strong>{" "}
@@ -478,9 +493,83 @@ const AdminDashboard = () => {
                               <strong>Category:</strong> {complaint.category}
                             </p>
                             <p>
+                              <strong>Department:</strong> {complaint.department || "N/A"}
+                            </p>
+                            <p>
+                              <strong>Status:</strong> {complaint.status}
+                            </p>
+                            <p>
+                              <strong>Location:</strong> {complaint.location || "N/A"}
+                            </p>
+                            <p>
+                              <strong>Coordinates:</strong>{" "}
+                              {complaint.latitude && complaint.longitude
+                                ? `${complaint.latitude}, ${complaint.longitude}`
+                                : "N/A"}
+                            </p>
+                            <p>
+                              <strong>Ward/Zone/Area:</strong> {complaint.ward || "N/A"} / {complaint.zone || "N/A"} / {complaint.area || "N/A"}
+                            </p>
+                            <p>
+                              <strong>Total Supports:</strong> {complaint.total_supports ?? complaint.support_total ?? 0}
+                            </p>
+                            <p>
                               <strong>Verification Notes:</strong>{" "}
                               {complaint.verification_notes}
                             </p>
+                          </div>
+
+                          <div className="mt-4">
+                            <h5 className="font-semibold text-gray-900 mb-2">
+                              Supporters ({complaint.supporter_details?.length || complaint.supporters?.length || 0})
+                            </h5>
+                            {(complaint.supporter_details && complaint.supporter_details.length > 0) ||
+                            (complaint.supporters && complaint.supporters.length > 0) ? (
+                              <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-2">
+                                {(complaint.supporter_details || complaint.supporters || []).map((supporter, index) => (
+                                  <div key={`${complaint.id}-${supporter.id || index}`} className="text-xs text-gray-700 bg-gray-50 rounded p-2">
+                                    <p><strong>Name:</strong> {supporter.name}</p>
+                                    <p><strong>Email:</strong> {supporter.email}</p>
+                                    {supporter.phone !== undefined && (
+                                      <p><strong>Phone:</strong> {supporter.phone || "N/A"}</p>
+                                    )}
+                                    {supporter.supported_at !== undefined && (
+                                      <p>
+                                        <strong>Supported At:</strong>{" "}
+                                        {supporter.supported_at
+                                          ? new Date(supporter.supported_at).toLocaleString()
+                                          : "N/A"}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500">No supporter details available</p>
+                            )}
+                          </div>
+
+                          <div className="mt-4">
+                            <h5 className="font-semibold text-gray-900 mb-2">
+                              Complaint Attachments ({complaint.documents?.length || 0})
+                            </h5>
+                            {complaint.documents && complaint.documents.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {complaint.documents.map((doc) => (
+                                  <a
+                                    key={doc.id}
+                                    href={doc.file}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                  >
+                                    {doc.file_name}
+                                  </a>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500">No attachments</p>
+                            )}
                           </div>
                         </div>
 

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser, Complaint, ComplaintDocument, Volunteer, VerificationImage, CivicContact
+from .models import CustomUser, Complaint, ComplaintDocument, Volunteer, VerificationImage, CivicContact, ComplaintSupport
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -18,9 +18,20 @@ class VerificationImageSerializer(serializers.ModelSerializer):
         model = VerificationImage
         fields = ('id', 'image', 'uploaded_at')
 
+
+class SupportSerializer(serializers.ModelSerializer):
+    created_at = serializers.DateTimeField(source='supported_at', read_only=True)
+
+    class Meta:
+        model = ComplaintSupport
+        fields = ('id', 'user', 'created_at')
+
 class ComplaintSerializer(serializers.ModelSerializer):
     documents = ComplaintDocumentSerializer(many=True, read_only=True)
     verification_images = VerificationImageSerializer(many=True, read_only=True)
+    supports = SupportSerializer(many=True, read_only=True)
+    total_supports = serializers.SerializerMethodField()
+    supporter_details = serializers.SerializerMethodField()
     user = CustomUserSerializer(read_only=True)
     verified_by_volunteer_user = CustomUserSerializer(read_only=True)
     
@@ -31,8 +42,23 @@ class ComplaintSerializer(serializers.ModelSerializer):
                   'status', 'sentiment', 'priority', 'support_count', 'is_public', 'verified_by_volunteer', 'verified_by_volunteer_user',
                   'verification_notes', 'volunteer_verification_timestamp', 'admin_verified', 'admin_verification_timestamp',
                   'flag_for_admin_review', 'admin_review_reason',
-                  'tracking_id', 'status_history', 'is_escalated', 'documents', 'verification_images', 'user', 'created_at', 'updated_at')
+                  'tracking_id', 'status_history', 'is_escalated', 'documents', 'verification_images',
+                  'supports', 'total_supports', 'supporter_details',
+                  'user', 'created_at', 'updated_at')
         read_only_fields = ('id', 'category', 'department', 'sentiment', 'priority', 'support_count', 'user', 'created_at', 'updated_at', 'verified_by_volunteer_user', 'volunteer_verification_timestamp', 'admin_verified', 'admin_verification_timestamp')
+
+    def get_total_supports(self, obj):
+        return obj.supports.count()
+
+    def get_supporter_details(self, obj):
+        details = []
+        for support in obj.supports.select_related('user').all():
+            full_name = f"{support.user.first_name} {support.user.last_name}".strip()
+            details.append({
+                'name': full_name or support.user.email,
+                'email': support.user.email,
+            })
+        return details
 
 
 class VolunteerSerializer(serializers.ModelSerializer):
