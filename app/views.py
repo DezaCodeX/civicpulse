@@ -611,10 +611,8 @@ def volunteer_dashboard_filters(request):
     if not vol.is_approved:
         return Response({'error': 'Volunteer not approved'}, status=status.HTTP_403_FORBIDDEN)
     
-    # Base query: complaints in volunteer's assigned location
-    complaints = Complaint.objects.filter(
-        Q(ward=vol.ward) | Q(zone=vol.zone) | Q(area_name=vol.area)
-    )
+    # Base query: all complaints (volunteer can narrow down using filters)
+    complaints = Complaint.objects.all()
     
     # Apply optional filters
     ward = request.query_params.get('ward')
@@ -633,9 +631,6 @@ def volunteer_dashboard_filters(request):
         complaints = complaints.filter(status=status_filter)
     if category:
         complaints = complaints.filter(category=category)
-    
-    # Exclude already verified complaints
-    complaints = complaints.filter(verified_by_volunteer=False)
     
     serializer = ComplaintSerializer(complaints.order_by('-created_at'), many=True)
     return Response(serializer.data)
