@@ -19,8 +19,16 @@ export const syncSupabaseWithDjango = async (supabaseSession) => {
   }
 
   try {
-    const email = supabaseSession.user.email;
+    const email = supabaseSession?.user?.email;
     const supabaseAccessToken = supabaseSession.access_token;
+
+    if (!email || !supabaseAccessToken) {
+      console.warn("Skipping Django sync due to incomplete Supabase session", {
+        hasEmail: !!email,
+        hasAccessToken: !!supabaseAccessToken,
+      });
+      return null;
+    }
 
     console.log("🔄 Syncing Supabase user with Django:", { email });
 
@@ -38,9 +46,14 @@ export const syncSupabaseWithDjango = async (supabaseSession) => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      let errorData = {};
+      try {
+        errorData = await response.json();
+      } catch (parseError) {
+        console.warn("Failed to parse Django sync error response", parseError);
+      }
       console.error("❌ Django sync failed:", errorData);
-      throw new Error(errorData.detail || "Failed to sync with Django");
+      throw new Error(errorData.error || errorData.detail || "Failed to sync with Django");
     }
 
     const data = await response.json();
@@ -207,6 +220,11 @@ export const checkSupabaseSessionAndSync = async () => {
     }
   }
 
-  const syncData = await syncSupabaseWithDjango(session);
-  return { session, user: syncData?.user };
+  try {
+    const syncData = await syncSupabaseWithDjango(session);
+    return { session, user: syncData?.user || null };
+  } catch (syncError) {
+    console.error("Supabase session found but Django sync failed:", syncError);
+    return { session, user: null, syncError };
+  }
 };

@@ -32,66 +32,73 @@ function App() {
     let isMounted = true
 
     const initializeAuth = async () => {
-      console.log('🔍 Checking existing session...')
+      try {
+        console.log('🔍 Checking existing session...')
 
-      const supabaseResult = await checkSupabaseSessionAndSync()
+        const supabaseResult = await checkSupabaseSessionAndSync()
 
-      if (supabaseResult?.user) {
-        console.log('✅ Supabase session restored:', supabaseResult.user.email)
-        if (isMounted) {
-          setUser(supabaseResult.user)
-          setIsLoggedIn(true)
-        }
-      } else {
-        const token = localStorage.getItem('access') || localStorage.getItem('access_token')
-        const userData = localStorage.getItem('user')
+        if (supabaseResult?.user) {
+          console.log('✅ Supabase session restored:', supabaseResult.user.email)
+          if (isMounted) {
+            setUser(supabaseResult.user)
+            setIsLoggedIn(true)
+          }
+        } else {
+          const token = localStorage.getItem('access') || localStorage.getItem('access_token')
+          const userData = localStorage.getItem('user')
 
-        console.log('📦 Token found:', !!token)
-        console.log('📦 User data found:', !!userData)
+          console.log('📦 Token found:', !!token)
+          console.log('📦 User data found:', !!userData)
 
-        if (token && userData) {
-          try {
-            const parsedUser = JSON.parse(userData)
-            console.log('✅ Setting user from localStorage:', parsedUser.email)
-            if (isMounted) {
-              setUser(parsedUser)
-              setIsLoggedIn(true)
+          if (token && userData) {
+            try {
+              const parsedUser = JSON.parse(userData)
+              console.log('✅ Setting user from localStorage:', parsedUser.email)
+              if (isMounted) {
+                setUser(parsedUser)
+                setIsLoggedIn(true)
+              }
+            } catch (err) {
+              console.error('Error parsing user data:', err)
+              if (isMounted) {
+                setIsLoggedIn(false)
+              }
             }
-          } catch (err) {
-            console.error('Error parsing user data:', err)
+          } else {
+            console.log('❌ No valid session found in localStorage')
             if (isMounted) {
               setIsLoggedIn(false)
             }
           }
-        } else {
-          console.log('❌ No valid session found in localStorage')
-          if (isMounted) {
+        }
+
+        subscription = setupAuthStateListener((event, data) => {
+          console.log('🔐 Auth state event:', event)
+
+          if (event === 'signed_in') {
+            console.log('✅ User signed in via Supabase')
+            setUser(data?.user)
+            setIsLoggedIn(true)
+          } else if (event === 'signed_out') {
+            console.log('❌ User signed out')
+            setUser(null)
             setIsLoggedIn(false)
+          } else if (event === 'user_updated') {
+            console.log('🔄 User updated')
+            setUser(data?.user)
+          } else if (event === 'error') {
+            console.error('Auth error:', data)
           }
-        }
-      }
-
-      subscription = setupAuthStateListener((event, data) => {
-        console.log('🔐 Auth state event:', event)
-
-        if (event === 'signed_in') {
-          console.log('✅ User signed in via Supabase')
-          setUser(data?.user)
-          setIsLoggedIn(true)
-        } else if (event === 'signed_out') {
-          console.log('❌ User signed out')
-          setUser(null)
+        })
+      } catch (error) {
+        console.error('❌ Auth initialization failed:', error)
+        if (isMounted) {
           setIsLoggedIn(false)
-        } else if (event === 'user_updated') {
-          console.log('🔄 User updated')
-          setUser(data?.user)
-        } else if (event === 'error') {
-          console.error('Auth error:', data)
         }
-      })
-
-      if (isMounted) {
-        setLoading(false)
+      } finally {
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 

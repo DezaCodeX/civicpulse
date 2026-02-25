@@ -139,12 +139,12 @@ def supabase_login(request):
         if not user:
             # Create new user from Supabase
             # Extract name from metadata if available
-            first_name = user_metadata.get('first_name', '')
-            last_name = user_metadata.get('last_name', '')
+            first_name = user_metadata.get('first_name') or user_metadata.get('given_name', '')
+            last_name = user_metadata.get('last_name') or user_metadata.get('family_name', '')
             
             # If no name in metadata, try to parse from user_metadata.name
             if not first_name and not last_name:
-                full_name = user_metadata.get('name', '')
+                full_name = user_metadata.get('name') or user_metadata.get('full_name', '')
                 if full_name:
                     name_parts = full_name.split(' ', 1)
                     first_name = name_parts[0]
@@ -154,7 +154,6 @@ def supabase_login(request):
                 email=email,
                 first_name=first_name,
                 last_name=last_name,
-                username=email.split('@')[0],  # Use part of email as username
             )
             logger.info(f"Created new user from Supabase: {email}")
         
